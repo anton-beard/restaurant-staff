@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Bot } from 'grammy'
+import type { Bot, BotError } from 'grammy'
 import { openDb, type Db } from '../db/connect.js'
 import { createPosition } from '../db/positions.js'
-import { createEmployee, getEmployee, linkTelegram } from '../db/employees.js'
+import { archiveEmployee, createEmployee, getEmployee, linkTelegram } from '../db/employees.js'
 import { getSetting, OWNER_TELEGRAM_ID, setSetting } from '../db/settings.js'
 import { botInfo, captureApi, contactUpdate, textUpdate } from '../test/telegram.js'
 import { createBot } from './createBot.js'
@@ -62,6 +62,48 @@ describe('linking', () => {
     await bot.handleUpdate(contactUpdate(500, '+79990000001'))
     expect(lastText()).toMatch(/другому аккаунту/i)
     expect(getEmployee(db, 1)?.telegram_id).toBe(777)
+  })
+
+  it('rejects a telegram account already linked to another employee', async () => {
+    createEmployee(db, { full_name: 'Пётр Сидоров', phone: '+79990000002', position_id: 1 })
+    linkTelegram(db, 1, 500)
+    await bot.handleUpdate(contactUpdate(500, '+79990000002'))
+    expect(lastText()).toMatch(/уже привязан к другому сотруднику/i)
+    expect(getEmployee(db, 2)).toMatchObject({ status: 'invited', telegram_id: null })
+  })
+
+  it('rejects the phone of an archived employee', async () => {
+    archiveEmployee(db, 1)
+    await bot.handleUpdate(contactUpdate(500, '+79990000001'))
+    expect(lastText()).toMatch(/не добавили/i)
+    expect(getEmployee(db, 1)?.telegram_id).toBeNull()
+  })
+
+  it('moves the owner to a new telegram account', async () => {
+    setSetting(db, OWNER_TELEGRAM_ID, '42')
+    await bot.handleUpdate(contactUpdate(43, '+79990000000'))
+    expect(getSetting(db, OWNER_TELEGRAM_ID)).toBe('43')
+  })
+})
+
+describe('errors', () => {
+  it('answers with an apology when a handler throws', async () => {
+    const failing = createBot({ token: 'test', db, ownerPhone: OWNER_PHONE, botInfo })
+    const failingCalls = captureApi(failing)
+    // Installed last, so it wraps the capture: the first reply fails, the apology is recorded.
+    let fail = true
+    failing.api.config.use(async (prev, method, payload, signal) => {
+      if (fail) {
+        fail = false
+        throw new Error('boom')
+      }
+      return prev(method, payload, signal)
+    })
+    // handleUpdate rethrows; the polling loop is what feeds errors to bot.catch.
+    await failing
+      .handleUpdate(textUpdate(500, '/start'))
+      .catch((err: unknown) => failing.errorHandler(err as BotError))
+    expect(String(failingCalls.at(-1)?.payload.text ?? '')).toMatch(/пошло не так/i)
   })
 })
 

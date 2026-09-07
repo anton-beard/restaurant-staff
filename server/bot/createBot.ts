@@ -47,7 +47,8 @@ export function createBot(opts: BotOptions): Bot {
   }
 
   async function showHome(ctx: Context): Promise<void> {
-    const role = roleOf(ctx.from!.id)
+    if (!ctx.from) return
+    const role = roleOf(ctx.from.id)
     if (role.kind === 'owner') {
       await ctx.reply(`Вы владелец.\n${summaryText()}`, { reply_markup: ownerMenu() })
     } else if (role.kind === 'employee') {
@@ -76,6 +77,10 @@ export function createBot(opts: BotOptions): Bot {
       return
     }
     if (phone === ownerPhone) {
+      const previous = getSetting(db, OWNER_TELEGRAM_ID)
+      if (previous && previous !== String(fromId)) {
+        console.warn(`owner telegram id changed from ${previous} to ${fromId}`)
+      }
       setSetting(db, OWNER_TELEGRAM_ID, String(fromId))
       await ctx.reply(`Вы вошли как владелец.\n${summaryText()}`, { reply_markup: ownerMenu() })
       return
@@ -90,6 +95,11 @@ export function createBot(opts: BotOptions): Bot {
       await ctx.reply('Этот номер уже привязан к другому аккаунту Telegram.')
       return
     }
+    const alreadyLinked = findEmployeeByTelegramId(db, fromId)
+    if (alreadyLinked && alreadyLinked.status === 'active' && alreadyLinked.phone !== phone) {
+      await ctx.reply('Ваш Telegram уже привязан к другому сотруднику. Обратитесь к владельцу.')
+      return
+    }
     const linked = linkTelegram(db, employee.id, fromId)!
     await ctx.reply(`Здравствуйте, ${linked.full_name}! Вы подключены.`, {
       reply_markup: employeeMenu(),
@@ -98,19 +108,27 @@ export function createBot(opts: BotOptions): Bot {
   })
 
   bot.hears([BTN.tasks, BTN.learning, BTN.quizzes, BTN.rating], async (ctx) => {
-    if (roleOf(ctx.from!.id).kind !== 'employee') return showHome(ctx)
+    if (!ctx.from) return
+    if (roleOf(ctx.from.id).kind !== 'employee') return showHome(ctx)
     await ctx.reply('Раздел появится в ближайшем обновлении.')
   })
 
   bot.hears(BTN.summary, async (ctx) => {
-    if (roleOf(ctx.from!.id).kind !== 'owner') return showHome(ctx)
+    if (!ctx.from) return
+    if (roleOf(ctx.from.id).kind !== 'owner') return showHome(ctx)
     await ctx.reply(summaryText(), { reply_markup: ownerMenu() })
   })
 
   bot.on('message', showHome)
 
-  bot.catch((err) => {
+  bot.catch(async (err) => {
     console.error('bot error', err.error)
+    if (!err.ctx.chat) return
+    try {
+      await err.ctx.reply('Что-то пошло не так, попробуйте ещё раз.')
+    } catch (replyErr) {
+      console.error('bot error reply failed', replyErr)
+    }
   })
 
   return bot
