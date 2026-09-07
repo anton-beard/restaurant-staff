@@ -54,6 +54,9 @@ describe('admin static', () => {
       expect(withQuery.statusCode).toBe(200)
       expect(withQuery.body).toContain('admin')
 
+      const head = await app.inject({ method: 'HEAD', url: '/employees' })
+      expect(head.statusCode).toBe(200)
+
       await app.close()
     } finally {
       rmSync(dir, { recursive: true, force: true })
