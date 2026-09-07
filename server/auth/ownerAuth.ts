@@ -6,6 +6,11 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60_000
 const ATTEMPT_WINDOW_MS = 10 * 60_000
 const MAX_ATTEMPTS = 5
 const LOCK_MS = 15 * 60_000
+/** Shortest gap between two issued login codes. */
+export const CODE_MIN_INTERVAL_MS = 60_000
+/** How many codes may be issued within one hour. */
+export const CODE_MAX_PER_HOUR = 5
+const CODE_WINDOW_MS = 60 * 60_000
 
 export type OwnerAuth = {
   createLoginCode(): string | 'locked'
@@ -18,10 +23,20 @@ const sha256 = (s: string) => createHash('sha256').update(s).digest('hex')
 
 export function createOwnerAuth(db: Db, now: () => number = Date.now): OwnerAuth {
   let failures: number[] = []
+  let issued: number[] = []
   let lockedUntil = 0
 
   function isLocked(): boolean {
     return now() < lockedUntil
+  }
+
+  /** Issuance throttle: kept in memory, so it resets with the process. */
+  function issuanceThrottled(): boolean {
+    const t = now()
+    issued = issued.filter((i) => t - i < CODE_WINDOW_MS)
+    const last = issued.at(-1)
+    if (last !== undefined && t - last < CODE_MIN_INTERVAL_MS) return true
+    return issued.length >= CODE_MAX_PER_HOUR
   }
 
   function registerFailure(): void {
@@ -36,7 +51,8 @@ export function createOwnerAuth(db: Db, now: () => number = Date.now): OwnerAuth
 
   return {
     createLoginCode() {
-      if (isLocked()) return 'locked'
+      if (isLocked() || issuanceThrottled()) return 'locked'
+      issued.push(now())
       const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
       db.prepare('delete from owner_login_codes').run()
       db.prepare('insert into owner_login_codes (code_hash, expires_at) values (?, ?)').run(

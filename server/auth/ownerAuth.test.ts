@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDb, type Db } from '../db/connect.js'
-import { createOwnerAuth, type OwnerAuth } from './ownerAuth.js'
+import {
+  CODE_MAX_PER_HOUR,
+  CODE_MIN_INTERVAL_MS,
+  createOwnerAuth,
+  type OwnerAuth,
+} from './ownerAuth.js'
 
 const MIN = 60_000
 let db: Db
@@ -30,9 +35,33 @@ describe('login code', () => {
 
   it('a new code invalidates the previous one', () => {
     const first = auth.createLoginCode() as string
+    clock += 61_000
     const second = auth.createLoginCode() as string
     expect(auth.verifyLoginCode(first)).toEqual({ error: 'invalid' })
     expect(auth.verifyLoginCode(second)).toHaveProperty('token')
+  })
+
+  it('refuses a second code within a minute', () => {
+    expect(auth.createLoginCode()).toMatch(/^\d{6}$/)
+    expect(auth.createLoginCode()).toBe('locked')
+    clock += CODE_MIN_INTERVAL_MS
+    expect(auth.createLoginCode()).toMatch(/^\d{6}$/)
+  })
+
+  it('allows 5 codes per hour and refuses the 6th', () => {
+    for (let i = 0; i < CODE_MAX_PER_HOUR; i++) {
+      expect(auth.createLoginCode()).toMatch(/^\d{6}$/)
+      clock += MIN + 1_000
+    }
+    expect(auth.createLoginCode()).toBe('locked')
+    clock += 60 * MIN
+    expect(auth.createLoginCode()).toMatch(/^\d{6}$/)
+  })
+
+  it('a successful login does not reset the issuance history', () => {
+    const code = auth.createLoginCode() as string
+    expect(auth.verifyLoginCode(code)).toHaveProperty('token')
+    expect(auth.createLoginCode()).toBe('locked')
   })
 
   it('locks for 15 minutes after 5 wrong attempts in 10 minutes', () => {
