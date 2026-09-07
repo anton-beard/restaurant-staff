@@ -27,9 +27,14 @@ const app = buildApp({
 })
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' })
-void bot.start({
-  onStart: (info) => app.log.info(`bot @${info.username} polling`),
-})
+bot
+  .start({
+    onStart: (info) => app.log.info(`bot @${info.username} polling`),
+  })
+  .catch((err: unknown) => {
+    app.log.error(err, 'bot failed to start, shutting down')
+    process.exit(1)
+  })
 
 let stopping = false
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
