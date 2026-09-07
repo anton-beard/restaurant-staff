@@ -96,7 +96,7 @@ export function createBot(opts: BotOptions): Bot {
       return
     }
     const alreadyLinked = findEmployeeByTelegramId(db, fromId)
-    if (alreadyLinked && alreadyLinked.status === 'active' && alreadyLinked.phone !== phone) {
+    if (alreadyLinked && alreadyLinked.id !== employee.id) {
       await ctx.reply('Ваш Telegram уже привязан к другому сотруднику. Обратитесь к владельцу.')
       return
     }

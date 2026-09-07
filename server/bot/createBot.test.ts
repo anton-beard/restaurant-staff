@@ -72,6 +72,15 @@ describe('linking', () => {
     expect(getEmployee(db, 2)).toMatchObject({ status: 'invited', telegram_id: null })
   })
 
+  it('rejects a telegram account already linked to an archived employee', async () => {
+    createEmployee(db, { full_name: 'Пётр Сидоров', phone: '+79990000002', position_id: 1 })
+    linkTelegram(db, 1, 500)
+    archiveEmployee(db, 1)
+    await bot.handleUpdate(contactUpdate(500, '+79990000002'))
+    expect(lastText()).toMatch(/другому сотруднику/i)
+    expect(getEmployee(db, 2)?.telegram_id).toBeNull()
+  })
+
   it('rejects the phone of an archived employee', async () => {
     archiveEmployee(db, 1)
     await bot.handleUpdate(contactUpdate(500, '+79990000001'))
