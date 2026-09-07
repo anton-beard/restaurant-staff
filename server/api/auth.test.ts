@@ -73,4 +73,10 @@ describe('auth api', () => {
     const res = await app.inject({ method: 'GET', url: '/api/positions' })
     expect(res.statusCode).toBe(401)
   })
+
+  it('rejects logout without a session', async () => {
+    const { app } = await buildTestApp()
+    const res = await app.inject({ method: 'POST', url: '/api/auth/logout' })
+    expect(res.statusCode).toBe(401)
+  })
 })

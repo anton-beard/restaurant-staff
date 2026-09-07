@@ -45,7 +45,7 @@ export const authRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     return reply.code(204).send()
   })
 
-  app.post('/api/auth/logout', async (req, reply) => {
+  app.post('/api/auth/logout', { preHandler: requireOwner(auth) }, async (req, reply) => {
     const token = sessionToken(req)
     if (token) auth.deleteSession(token)
     reply.clearCookie(SESSION_COOKIE, { path: '/' })
