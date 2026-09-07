@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { openDb } from './connect.js'
 
@@ -38,14 +41,25 @@ describe('openDb', () => {
     expect(() => ins.run('B', '+79990000001')).toThrow(/UNIQUE/)
   })
 
-  it('is idempotent: migrations run once', () => {
-    const db = openDb(':memory:')
-    const count = () =>
-      (db.prepare('select count(*) c from schema_migrations').get() as { c: number }).c
-    const first = count()
-    expect(first).toBeGreaterThan(0)
-    // повторный прогон миграций на той же базе ничего не добавляет
-    db.exec('select 1')
-    expect(count()).toBe(first)
+  it('is idempotent: reopening the same file does not re-run migrations', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'db-'))
+    const file = join(dir, 'app.db')
+    try {
+      const first = openDb(file)
+      const count = (db: ReturnType<typeof openDb>) =>
+        (db.prepare('select count(*) c from schema_migrations').get() as { c: number }).c
+      const applied = count(first)
+      expect(applied).toBeGreaterThan(0)
+      first.prepare("insert into positions (name) values ('Официант')").run()
+      first.close()
+
+      const second = openDb(file)
+      expect(count(second)).toBe(applied)
+      expect(second.prepare('select count(*) c from positions').get()).toEqual({ c: 1 })
+      expect(second.pragma('journal_mode', { simple: true })).toBe('wal')
+      second.close()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
