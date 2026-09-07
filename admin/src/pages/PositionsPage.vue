@@ -7,7 +7,11 @@ const newName = ref('')
 const error = ref('')
 
 async function load() {
-  positions.value = await api.positions.list()
+  try {
+    positions.value = await api.positions.list()
+  } catch (err) {
+    error.value = errorText(err)
+  }
 }
 
 async function add() {

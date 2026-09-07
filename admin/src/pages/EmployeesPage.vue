@@ -21,11 +21,15 @@ const statusLabel: Record<Employee['status'], string> = {
 }
 
 async function load() {
-  ;[employees.value, positions.value] = await Promise.all([
-    api.employees.list(includeArchived.value),
-    api.positions.list(),
-  ])
-  if (!form.position_id && positions.value[0]) form.position_id = positions.value[0].id
+  try {
+    ;[employees.value, positions.value] = await Promise.all([
+      api.employees.list(includeArchived.value),
+      api.positions.list(),
+    ])
+    if (!form.position_id && positions.value[0]) form.position_id = positions.value[0].id
+  } catch (err) {
+    error.value = errorText(err)
+  }
 }
 
 function startEdit(e: Employee) {
@@ -62,8 +66,13 @@ async function submit() {
 
 async function archive(e: Employee) {
   if (!window.confirm(`Отправить ${e.full_name} в архив?`)) return
-  await api.employees.archive(e.id)
-  await load()
+  error.value = ''
+  try {
+    await api.employees.archive(e.id)
+    await load()
+  } catch (err) {
+    error.value = errorText(err)
+  }
 }
 
 onMounted(load)
@@ -72,6 +81,8 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <h1 class="text-xl font-semibold">Сотрудники</h1>
+
+    <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
     <p v-if="positions.length === 0" class="text-sm text-amber-700">
       Сначала добавьте хотя бы одну должность.
@@ -89,7 +100,6 @@ onMounted(load)
           Отмена
         </button>
       </div>
-      <p v-if="error" class="text-sm text-red-600 md:col-span-4">{{ error }}</p>
     </form>
 
     <label class="text-sm flex items-center gap-2">
