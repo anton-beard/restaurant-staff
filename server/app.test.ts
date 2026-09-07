@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildApp } from './app.js'
@@ -39,6 +39,21 @@ describe('admin static', () => {
       expect(deep.body).toContain('admin')
       const api = await app.inject({ method: 'GET', url: '/api/nope' })
       expect(api.statusCode).toBe(404)
+
+      mkdirSync(join(dir, 'assets'))
+      writeFileSync(join(dir, 'assets', 'late.js'), 'console.log(1)')
+      const late = await app.inject({ method: 'GET', url: '/assets/late.js' })
+      expect(late.statusCode).toBe(200)
+      expect(late.body).toBe('console.log(1)')
+
+      const missing = await app.inject({ method: 'GET', url: '/assets/missing.js' })
+      expect(missing.statusCode).toBe(404)
+      expect(missing.json()).toEqual({ error: 'not_found' })
+
+      const withQuery = await app.inject({ method: 'GET', url: '/employees?tab=1' })
+      expect(withQuery.statusCode).toBe(200)
+      expect(withQuery.body).toContain('admin')
+
       await app.close()
     } finally {
       rmSync(dir, { recursive: true, force: true })

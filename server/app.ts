@@ -1,4 +1,9 @@
-import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyRequest,
+  type FastifyReply,
+} from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import fastifyStatic from '@fastify/static'
 import { existsSync } from 'node:fs'
@@ -52,16 +57,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     scope.register(employeeRoutes, { db })
   })
 
+  const notFound = (_req: FastifyRequest, reply: FastifyReply) =>
+    reply.code(404).send({ error: 'not_found' })
+
   if (deps.adminDistDir && existsSync(deps.adminDistDir)) {
-    app.register(fastifyStatic, { root: deps.adminDistDir, wildcard: false })
+    app.register(fastifyStatic, { root: deps.adminDistDir })
     app.setNotFoundHandler((req, reply) => {
-      if (req.method === 'GET' && !req.url.startsWith('/api/')) {
+      const path = req.url.split('?')[0] ?? ''
+      const looksLikeFile = /\.[a-z0-9]+$/i.test(path)
+      if (req.method === 'GET' && !path.startsWith('/api/') && !looksLikeFile) {
         return reply.sendFile('index.html')
       }
-      return reply.code(404).send({ error: 'not_found' })
+      return notFound(req, reply)
     })
   } else {
-    app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'not_found' }))
+    app.setNotFoundHandler(notFound)
   }
 
   return app
