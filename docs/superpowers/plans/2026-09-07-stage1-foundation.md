@@ -1058,7 +1058,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Produces HTTP-контракт:
   - `POST /api/auth/request-code` → 204; 409 `{ error: 'owner_not_linked' }`; 429 `{ error: 'locked' }`.
   - `POST /api/auth/verify` `{ code }` → 204 + cookie `session`; 401 `{ error: 'invalid' }`; 429 `{ error: 'locked' }`.
-  - `POST /api/auth/logout` → 204. `GET /api/auth/me` → 200 `{ ok: true }` или 401.
+  - `POST /api/auth/logout` → 204 (требует сессии, иначе 401). `GET /api/auth/me` → 200 `{ ok: true }` или 401.
   - `GET /api/positions` → `Position[]`; `POST /api/positions` `{ name }` → 201 `Position`; `PATCH /api/positions/:id` `{ name }` → 200 / 404; `DELETE /api/positions/:id` → 204 / 409 `{ error: 'in_use' }` / 404.
   - `GET /api/employees?includeArchived=1` → `Employee[]`; `POST /api/employees` `{ full_name, phone, position_id }` → 201 `Employee`; `PATCH /api/employees/:id` → 200 / 404; `POST /api/employees/:id/archive` → 200 / 404.
   - Ошибки: 400 `{ error: 'validation', issues }`, 401 `{ error: 'unauthorized' }`, 404 `{ error: 'not_found' }`, 409 `{ error: 'conflict' }` при нарушении UNIQUE (дубликат телефона или названия должности).
@@ -2491,7 +2491,7 @@ import { setAuthed } from '../router'
 const router = useRouter()
 
 async function logout() {
-  await api.logout()
+  await api.logout().catch(() => undefined)
   setAuthed(false)
   await router.push('/login')
 }
