@@ -9,6 +9,7 @@ import {
   getEmployee,
   linkTelegram,
   listEmployees,
+  unarchiveEmployee,
   updateEmployee,
 } from './employees.js'
 import { getSetting, OWNER_TELEGRAM_ID, setSetting } from './settings.js'
@@ -58,6 +59,17 @@ describe('employees', () => {
     expect(listEmployees(db)).toEqual([])
     expect(listEmployees(db, { includeArchived: true })).toHaveLength(1)
     expect(updateEmployee(db, 77, { full_name: 'X' })).toBeNull()
+  })
+
+  it('unarchives only archived employees', () => {
+    const p = createPosition(db, 'Официант')
+    createEmployee(db, { full_name: 'Иван', phone: '+79990000001', position_id: p.id })
+    linkTelegram(db, 1, 123456789)
+    expect(unarchiveEmployee(db, 1)).toBeNull()
+    expect(unarchiveEmployee(db, 77)).toBeNull()
+    archiveEmployee(db, 1)
+    expect(unarchiveEmployee(db, 1)).toMatchObject({ status: 'invited', telegram_id: null })
+    expect(listEmployees(db)).toHaveLength(1)
   })
 })
 

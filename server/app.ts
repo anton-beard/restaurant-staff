@@ -35,6 +35,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.code(400).send({ error: 'validation', issues: err.issues })
     }
     const code = (err as { code?: string }).code ?? ''
+    if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+      return reply.code(400).send({ error: 'invalid_reference' })
+    }
     if (code.startsWith('SQLITE_CONSTRAINT')) {
       return reply.code(409).send({ error: 'conflict' })
     }
@@ -48,7 +51,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     db,
     auth,
     sendToOwner,
-    secureCookie: config.PUBLIC_URL?.startsWith('https://') ?? false,
+    // The Docker image sets NODE_ENV=production, so a container always gets a secure cookie.
+    secureCookie:
+      process.env.NODE_ENV === 'production' || (config.PUBLIC_URL?.startsWith('https://') ?? false),
   })
 
   app.register(async (scope) => {
@@ -65,12 +70,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     app.setNotFoundHandler((req, reply) => {
       const path = req.url.split('?')[0] ?? ''
       const looksLikeFile = /\.[a-z0-9]+$/i.test(path)
-      if (req.method === 'GET' && !path.startsWith('/api/') && !looksLikeFile) {
+      const wantsPage = req.method === 'GET' || req.method === 'HEAD'
+      if (wantsPage && !path.startsWith('/api/') && !looksLikeFile) {
         return reply.sendFile('index.html')
       }
       return notFound(req, reply)
     })
   } else {
+    if (deps.adminDistDir) {
+      app.log.warn({ adminDistDir: deps.adminDistDir }, 'admin dist not found, SPA not served')
+    }
     app.setNotFoundHandler(notFound)
   }
 

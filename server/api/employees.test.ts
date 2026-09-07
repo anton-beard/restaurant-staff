@@ -45,7 +45,28 @@ describe('employees api', () => {
       headers: h,
       payload: { full_name: 'Иван', phone: '+79990000001', position_id: 77 },
     })
-    expect(res.statusCode).toBe(409)
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ error: 'invalid_reference' })
+  })
+
+  it('unarchives an employee back to invited', async () => {
+    const { app, h } = await setup()
+    await app.inject({
+      method: 'POST',
+      url: '/api/employees',
+      headers: h,
+      payload: { full_name: 'Иван', phone: '+79990000001', position_id: 1 },
+    })
+    const active = await app.inject({ method: 'POST', url: '/api/employees/1/unarchive', headers: h })
+    expect(active.statusCode).toBe(404)
+
+    await app.inject({ method: 'POST', url: '/api/employees/1/archive', headers: h })
+    const back = await app.inject({ method: 'POST', url: '/api/employees/1/unarchive', headers: h })
+    expect(back.statusCode).toBe(200)
+    expect(back.json()).toMatchObject({ status: 'invited', telegram_id: null })
+
+    const missing = await app.inject({ method: 'POST', url: '/api/employees/9/unarchive', headers: h })
+    expect(missing.statusCode).toBe(404)
   })
 
   it('lists, updates and archives', async () => {

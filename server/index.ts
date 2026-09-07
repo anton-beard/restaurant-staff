@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { loadConfig } from './config.js'
 import { openDb } from './db/connect.js'
@@ -9,6 +9,13 @@ import { buildApp } from './app.js'
 
 const config = loadConfig()
 mkdirSync(config.DATA_DIR, { recursive: true })
+
+// dist/server/index.js -> ../../admin/dist; server/index.ts under tsx -> ../admin/dist.
+const adminCandidates = [
+  resolve(import.meta.dirname, '../../admin/dist'),
+  resolve(import.meta.dirname, '../admin/dist'),
+]
+const adminDistDir = adminCandidates.find(existsSync) ?? adminCandidates[0]!
 
 const db = openDb(join(config.DATA_DIR, 'app.db'))
 const auth = createOwnerAuth(db)
@@ -23,7 +30,7 @@ const app = buildApp({
   db,
   auth,
   sendToOwner: (text) => notifyOwner(bot.api, db, text),
-  adminDistDir: resolve('admin/dist'),
+  adminDistDir,
 })
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' })

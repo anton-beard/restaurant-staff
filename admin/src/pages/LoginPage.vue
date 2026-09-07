@@ -67,7 +67,7 @@ async function verify() {
             autofocus
           />
         </label>
-        <button class="btn w-full" :disabled="busy || code.length !== 6">Войти</button>
+        <button class="btn w-full" :disabled="busy || code.trim().length !== 6">Войти</button>
         <button type="button" class="text-sm text-gray-500 underline" @click="requestCode">
           Отправить код ещё раз
         </button>

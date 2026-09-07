@@ -60,6 +60,7 @@ async function submit() {
     error.value = errorText(err, {
       conflict: 'Сотрудник с таким телефоном уже есть.',
       validation: 'Проверьте имя и номер телефона.',
+      invalid_reference: 'Выбранная должность не существует.',
     })
   }
 }
@@ -69,6 +70,16 @@ async function archive(e: Employee) {
   error.value = ''
   try {
     await api.employees.archive(e.id)
+    await load()
+  } catch (err) {
+    error.value = errorText(err)
+  }
+}
+
+async function unarchive(e: Employee) {
+  error.value = ''
+  try {
+    await api.employees.unarchive(e.id)
     await load()
   } catch (err) {
     error.value = errorText(err)
@@ -126,6 +137,7 @@ onMounted(load)
           <td class="px-4 py-2 text-right space-x-2">
             <button v-if="e.status !== 'archived'" class="btn-secondary" @click="startEdit(e)">Изменить</button>
             <button v-if="e.status !== 'archived'" class="btn-secondary" @click="archive(e)">В архив</button>
+            <button v-if="e.status === 'archived'" class="btn-secondary" @click="unarchive(e)">Вернуть</button>
           </td>
         </tr>
         <tr v-if="employees.length === 0">

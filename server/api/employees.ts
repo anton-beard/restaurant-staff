@@ -5,10 +5,11 @@ import {
   archiveEmployee,
   createEmployee,
   listEmployees,
+  unarchiveEmployee,
   updateEmployee,
 } from '../db/employees.js'
 import { normalizePhone } from '../lib/phone.js'
-import { parse, ValidationError } from '../lib/validate.js'
+import { idParams, parse, ValidationError } from '../lib/validate.js'
 
 const phone = z.string().transform((raw, ctx) => {
   const normalized = normalizePhone(raw)
@@ -25,7 +26,6 @@ const createBody = z.object({
   position_id: z.number().int().positive(),
 })
 const patchBody = createBody.partial()
-const params = z.object({ id: z.coerce.number().int().positive() })
 const listQuery = z.object({ includeArchived: z.string().optional() })
 
 export const employeeRoutes: FastifyPluginAsync<{ db: Db }> = async (app, { db }) => {
@@ -40,7 +40,7 @@ export const employeeRoutes: FastifyPluginAsync<{ db: Db }> = async (app, { db }
   })
 
   app.patch('/api/employees/:id', async (req, reply) => {
-    const { id } = parse(params, req.params)
+    const { id } = parse(idParams, req.params)
     const patch = parse(patchBody, req.body)
     if (Object.keys(patch).length === 0) throw new ValidationError([{ message: 'Пустое изменение' }])
     const updated = updateEmployee(db, id, patch)
@@ -48,8 +48,14 @@ export const employeeRoutes: FastifyPluginAsync<{ db: Db }> = async (app, { db }
   })
 
   app.post('/api/employees/:id/archive', async (req, reply) => {
-    const { id } = parse(params, req.params)
+    const { id } = parse(idParams, req.params)
     const archived = archiveEmployee(db, id)
     return archived ?? reply.code(404).send({ error: 'not_found' })
+  })
+
+  app.post('/api/employees/:id/unarchive', async (req, reply) => {
+    const { id } = parse(idParams, req.params)
+    const restored = unarchiveEmployee(db, id)
+    return restored ?? reply.code(404).send({ error: 'not_found' })
   })
 }

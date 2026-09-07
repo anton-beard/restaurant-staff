@@ -57,6 +57,13 @@ export function archiveEmployee(db: Db, id: number): Employee | null {
   return info.changes === 0 ? null : getEmployee(db, id)
 }
 
+export function unarchiveEmployee(db: Db, id: number): Employee | null {
+  const info = db
+    .prepare("update employees set status = 'invited', telegram_id = null where id = ? and status = 'archived'")
+    .run(id)
+  return info.changes === 0 ? null : getEmployee(db, id)
+}
+
 export function findEmployeeByPhone(db: Db, phone: string): Employee | null {
   return (
     (db.prepare(`select ${columns} from employees where phone = ?`).get(phone) as Employee) ?? null

@@ -53,6 +53,7 @@ export const api = {
     update: (id: number, patch: Partial<EmployeeInput>) =>
       request<Employee>('PATCH', `/api/employees/${id}`, patch),
     archive: (id: number) => request<Employee>('POST', `/api/employees/${id}/archive`),
+    unarchive: (id: number) => request<Employee>('POST', `/api/employees/${id}/unarchive`),
   },
 }
 
