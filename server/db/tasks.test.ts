@@ -123,6 +123,22 @@ describe('task instances', () => {
     setInstanceStatus(db, p.id, 'accepted', { completed_at: NOW })
     expect(getInstanceRow(db, p.id)).toMatchObject({ status: 'accepted', completed_at: NOW })
   })
+
+  it('after a shared instance is claimed, the same employee cannot get an "each" copy for that slot', () => {
+    const shared = createInstance(db, { template_id: templateId, employee_id: null, slot_at: NOW, issued_at: NOW, due_at: NOW, status: 'open' })!
+    expect(claimInstance(db, shared.id, seed.employees.ivan.id, NOW)).toBe(true)
+    // (template, slot, employee) теперь занято экземпляром, который был общим
+    expect(createInstance(db, { template_id: templateId, employee_id: seed.employees.ivan.id, slot_at: NOW, issued_at: NOW, due_at: NOW, status: 'pending' })).toBeNull()
+    // а новый общий экземпляр на тот же слот снова возможен: партиальный индекс смотрит только на строки с employee_id null
+    expect(createInstance(db, { template_id: templateId, employee_id: null, slot_at: NOW, issued_at: NOW, due_at: NOW, status: 'open' })).not.toBeNull()
+  })
+
+  it('listInstances "to" is exclusive on issued_at', () => {
+    createInstance(db, { template_id: templateId, employee_id: seed.employees.ivan.id, slot_at: NOW, issued_at: '2026-09-07T10:00:00.000Z', due_at: NOW, status: 'pending' })
+    createInstance(db, { template_id: templateId, employee_id: seed.employees.anna.id, slot_at: NOW, issued_at: '2026-09-07T12:00:00.000Z', due_at: NOW, status: 'pending' })
+    expect(listInstances(db, { to: '2026-09-07T12:00:00.000Z' })).toHaveLength(1)
+    expect(listInstances(db, { from: '2026-09-07T10:00:00.000Z', to: '2026-09-07T12:00:00.001Z' })).toHaveLength(2)
+  })
 })
 
 describe('submissions', () => {
