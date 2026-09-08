@@ -10,9 +10,11 @@ export type Employee = {
   telegram_id: number | null
   status: EmployeeStatus
   created_at: string
+  linked_at: string | null
+  position_changed_at: string
 }
 
-const columns = 'id, full_name, phone, position_id, telegram_id, status, created_at'
+const columns = 'id, full_name, phone, position_id, telegram_id, status, created_at, linked_at, position_changed_at'
 
 export function listEmployees(db: Db, opts: { includeArchived?: boolean } = {}): Employee[] {
   const where = opts.includeArchived ? '' : "where status != 'archived'"
@@ -30,7 +32,9 @@ export function createEmployee(
   input: { full_name: string; phone: string; position_id: number },
 ): Employee {
   const info = db
-    .prepare('insert into employees (full_name, phone, position_id) values (?, ?, ?)')
+    .prepare(
+      "insert into employees (full_name, phone, position_id, position_changed_at) values (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+    )
     .run(input.full_name, input.phone, input.position_id)
   return getEmployee(db, Number(info.lastInsertRowid))!
 }
@@ -43,12 +47,18 @@ export function updateEmployee(
   const current = getEmployee(db, id)
   if (!current) return null
   const next = { ...current, ...patch }
-  db.prepare('update employees set full_name = ?, phone = ?, position_id = ? where id = ?').run(
-    next.full_name,
-    next.phone,
-    next.position_id,
-    id,
-  )
+  if (patch.position_id !== undefined && patch.position_id !== current.position_id) {
+    db.prepare(
+      "update employees set full_name = ?, phone = ?, position_id = ?, position_changed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = ?",
+    ).run(next.full_name, next.phone, next.position_id, id)
+  } else {
+    db.prepare('update employees set full_name = ?, phone = ?, position_id = ? where id = ?').run(
+      next.full_name,
+      next.phone,
+      next.position_id,
+      id,
+    )
+  }
   return getEmployee(db, id)
 }
 
@@ -80,7 +90,9 @@ export function findEmployeeByTelegramId(db: Db, telegramId: number): Employee |
 
 export function linkTelegram(db: Db, id: number, telegramId: number): Employee | null {
   const info = db
-    .prepare("update employees set telegram_id = ?, status = 'active' where id = ?")
+    .prepare(
+      "update employees set telegram_id = ?, status = 'active', linked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = ?",
+    )
     .run(telegramId, id)
   return info.changes === 0 ? null : getEmployee(db, id)
 }

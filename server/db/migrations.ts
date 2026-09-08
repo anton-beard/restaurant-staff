@@ -126,4 +126,101 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    name: '003_learning',
+    sql: `
+      alter table employees add column linked_at text;
+      alter table employees add column position_changed_at text;
+      update employees set linked_at = case when telegram_id is not null then created_at else null end,
+                           position_changed_at = created_at;
+
+      create table courses (
+        id integer primary key autoincrement,
+        title text not null,
+        description text not null default '',
+        due_days integer not null,
+        pass_score integer not null default 80,
+        status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
+        published_at text,
+        assign_existing integer not null default 0,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      );
+      create table course_positions (
+        course_id integer not null references courses(id) on delete cascade,
+        position_id integer not null references positions(id),
+        primary key (course_id, position_id)
+      );
+      create table lessons (
+        id integer primary key autoincrement,
+        course_id integer not null references courses(id) on delete cascade,
+        position integer not null,
+        title text not null,
+        body text not null default '',
+        media text not null default '[]',
+        unique (course_id, position)
+      );
+      create table quizzes (
+        id integer primary key autoincrement,
+        title text not null,
+        course_id integer references courses(id) on delete cascade,
+        pass_score integer not null default 80,
+        schedule text,
+        deadline_minutes integer,
+        status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
+        next_run_at text,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      );
+      create unique index quizzes_course on quizzes(course_id) where course_id is not null;
+      create table quiz_positions (
+        quiz_id integer not null references quizzes(id) on delete cascade,
+        position_id integer not null references positions(id),
+        primary key (quiz_id, position_id)
+      );
+      create table questions (
+        id integer primary key autoincrement,
+        quiz_id integer not null references quizzes(id) on delete cascade,
+        position integer not null,
+        text text not null,
+        options text not null,
+        correct_index integer not null,
+        unique (quiz_id, position)
+      );
+      create table course_assignments (
+        id integer primary key autoincrement,
+        course_id integer not null references courses(id),
+        employee_id integer not null references employees(id),
+        assigned_at text not null,
+        due_at text not null,
+        current_lesson integer not null default 1,
+        status text not null default 'in_progress' check (status in ('in_progress', 'completed', 'overdue')),
+        completed_at text,
+        reminder_sent_at text,
+        unique (course_id, employee_id)
+      );
+      create table quiz_assignments (
+        id integer primary key autoincrement,
+        quiz_id integer not null references quizzes(id),
+        employee_id integer not null references employees(id),
+        course_assignment_id integer references course_assignments(id),
+        slot_at text not null,
+        assigned_at text not null,
+        due_at text not null,
+        status text not null default 'pending' check (status in ('pending', 'passed', 'overdue')),
+        passed_at text,
+        reminder_sent_at text,
+        unique (quiz_id, employee_id, slot_at)
+      );
+      create table quiz_attempts (
+        id integer primary key autoincrement,
+        assignment_id integer not null references quiz_assignments(id),
+        started_at text not null,
+        finished_at text,
+        current_question integer not null default 1,
+        answers text not null default '[]',
+        score integer,
+        passed integer
+      );
+      create index quiz_attempts_open on quiz_attempts(assignment_id) where finished_at is null;
+    `,
+  },
 ]

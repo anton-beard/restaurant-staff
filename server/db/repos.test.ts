@@ -61,6 +61,22 @@ describe('employees', () => {
     expect(updateEmployee(db, 77, { full_name: 'X' })).toBeNull()
   })
 
+  it('tracks linking and position change moments', () => {
+    const p1 = createPosition(db, 'Официант')
+    const p2 = createPosition(db, 'Бармен')
+    const e = createEmployee(db, { full_name: 'Иван', phone: '+79990000001', position_id: p1.id })
+    expect(e.linked_at).toBeNull()
+    expect(e.position_changed_at).toBe(e.created_at)
+    const linked = linkTelegram(db, e.id, 5)!
+    expect(linked.linked_at).not.toBeNull()
+    const same = updateEmployee(db, e.id, { full_name: 'Пётр' })!
+    expect(same.position_changed_at).toBe(e.position_changed_at)
+    db.prepare("update employees set position_changed_at = '2000-01-01T00:00:00.000Z' where id = ?").run(e.id)
+    const moved = updateEmployee(db, e.id, { position_id: p2.id })!
+    expect(moved.position_changed_at).not.toBe('2000-01-01T00:00:00.000Z')
+    expect(moved.position_changed_at > '2026-01-01').toBe(true)
+  })
+
   it('unarchives only archived employees', () => {
     const p = createPosition(db, 'Официант')
     createEmployee(db, { full_name: 'Иван', phone: '+79990000001', position_id: p.id })
