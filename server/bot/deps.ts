@@ -7,4 +7,8 @@ export type BotDeps = {
   publicUrl?: string
   notifier: Notifier
   tz: string
+  uploadsDir: string
+  downloadFile: (filePath: string) => Promise<Buffer>
+  onSubmission: (submissionId: number) => void
+  now: () => Date
 }

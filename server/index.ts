@@ -5,6 +5,7 @@ import { loadConfig } from './config.js'
 import { openDb } from './db/connect.js'
 import { createOwnerAuth } from './auth/ownerAuth.js'
 import { createBot } from './bot/createBot.js'
+import { telegramDownloader } from './bot/files.js'
 import { createTelegramNotifier } from './notify.js'
 import { buildApp } from './app.js'
 
@@ -26,7 +27,18 @@ const api = new Api(config.BOT_TOKEN)
 const notifier = createTelegramNotifier(api, db)
 const bot = createBot({
   token: config.BOT_TOKEN,
-  deps: { db, ownerPhone: config.OWNER_PHONE, publicUrl: config.PUBLIC_URL, notifier, tz: config.TZ },
+  deps: {
+    db,
+    ownerPhone: config.OWNER_PHONE,
+    publicUrl: config.PUBLIC_URL,
+    notifier,
+    tz: config.TZ,
+    uploadsDir,
+    downloadFile: telegramDownloader(config.BOT_TOKEN),
+    // TODO(Task 7/11): wire to the review queue once it exists.
+    onSubmission: () => undefined,
+    now: () => new Date(),
+  },
 })
 const app = buildApp({ config, db, auth, notifier, uploadsDir, adminDistDir })
 
