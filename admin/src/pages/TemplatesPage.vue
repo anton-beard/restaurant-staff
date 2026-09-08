@@ -79,7 +79,7 @@ onMounted(load)
           <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
             <RouterLink :to="`/tasks/${t.id}/edit`" class="btn-secondary">Изменить</RouterLink>
             <button class="btn-secondary" @click="toggle(t)">{{ t.active ? 'В архив' : 'Вернуть' }}</button>
-            <button class="btn-secondary" @click="remove(t)">Удалить</button>
+            <button class="btn-secondary" :disabled="t.has_instances" :title="t.has_instances ? 'По заданию уже есть история, отправьте его в архив' : ''" @click="remove(t)">Удалить</button>
           </td>
         </tr>
         <tr v-if="templates.length === 0">

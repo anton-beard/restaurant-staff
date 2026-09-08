@@ -76,6 +76,8 @@ describe('task templates', () => {
     const t = createTaskTemplate(db, { ...baseInput, position_ids: [seed.positions.barista.id] }, null)
     const withHistory = createTaskTemplate(db, { ...baseInput, position_ids: [seed.positions.barista.id] }, null)
     createInstance(db, { template_id: withHistory.id, employee_id: seed.employees.ivan.id, slot_at: NOW, issued_at: NOW, due_at: NOW, status: 'pending' })
+    expect(getTaskTemplate(db, withHistory.id)?.has_instances).toBe(true)
+    expect(getTaskTemplate(db, t.id)?.has_instances).toBe(false)
     expect(deleteTaskTemplate(db, withHistory.id)).toBe('has_instances')
     expect(deleteTaskTemplate(db, t.id)).toBe('deleted')
     expect(getTaskTemplate(db, t.id)).toBeNull()

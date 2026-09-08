@@ -21,9 +21,10 @@ export type TaskTemplate = {
   created_at: string
   position_ids: number[]
   employee_ids: number[]
+  has_instances: boolean
 }
 
-export type TaskTemplateInput = Omit<TaskTemplate, 'id' | 'next_run_at' | 'active' | 'created_at'>
+export type TaskTemplateInput = Omit<TaskTemplate, 'id' | 'next_run_at' | 'active' | 'created_at' | 'has_instances'>
 
 type Row = {
   id: number; title: string; description: string; requires_photo: number; photo_criteria: string | null
@@ -38,6 +39,7 @@ const columns =
 function hydrate(db: Db, row: Row): TaskTemplate {
   const position_ids = (db.prepare('select position_id from task_template_positions where template_id = ? order by position_id').all(row.id) as { position_id: number }[]).map((r) => r.position_id)
   const employee_ids = (db.prepare('select employee_id from task_template_employees where template_id = ? order by employee_id').all(row.id) as { employee_id: number }[]).map((r) => r.employee_id)
+  const has_instances = db.prepare('select 1 from task_instances where template_id = ? limit 1').get(row.id) !== undefined
   return {
     id: row.id,
     title: row.title,
@@ -54,6 +56,7 @@ function hydrate(db: Db, row: Row): TaskTemplate {
     created_at: row.created_at,
     position_ids,
     employee_ids,
+    has_instances,
   }
 }
 

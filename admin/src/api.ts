@@ -55,8 +55,9 @@ export type TaskTemplate = {
   created_at: string
   position_ids: number[]
   employee_ids: number[]
+  has_instances: boolean
 }
-export type TaskTemplateInput = Omit<TaskTemplate, 'id' | 'next_run_at' | 'active' | 'created_at'>
+export type TaskTemplateInput = Omit<TaskTemplate, 'id' | 'next_run_at' | 'active' | 'created_at' | 'has_instances'>
 
 export type InstanceStatus = 'open' | 'pending' | 'submitted' | 'review' | 'accepted' | 'overdue'
 export type InstanceRow = {

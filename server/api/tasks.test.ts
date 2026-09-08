@@ -101,6 +101,7 @@ describe('task templates api', () => {
     expect((await app.inject({ method: 'DELETE', url: '/api/tasks/templates/1' })).statusCode).toBe(401)
     const list = await app.inject({ method: 'GET', url: '/api/tasks/templates?includeInactive=1', headers: h })
     expect(list.json().map((t: { id: number }) => t.id)).toEqual([issued.json().template.id])
+    expect(list.json()[0]).toMatchObject({ has_instances: true })
   })
 })
 
