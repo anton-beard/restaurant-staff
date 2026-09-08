@@ -40,9 +40,18 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
     const row = getReviewRow(db, submissionId)
     const template = row ? getTaskTemplate(db, row.template_id) : null
     if (!row || !template) return
-    markAiStarted(db, submissionId)
     const photos = listPhotos(db, submissionId).filter((p) => p.deleted_at === null)
     const paths = photos.map((p) => join(uploadsDir, p.path))
+    if (paths.length === 0) {
+      console.warn('photo review skipped: no photos on disk', submissionId)
+      markAiFailed(db, submissionId, now().toISOString())
+      setInstanceStatus(db, row.instance_id, 'review')
+      await notifyEmployee(row.employee_id, 'Отправил владельцу на проверку.')
+      const freshReview = getReviewRow(db, submissionId)!
+      await notifier.toOwner(ownerReviewCaption(freshReview), { keyboard: reviewKeyboard(submissionId) })
+      return
+    }
+    markAiStarted(db, submissionId)
     try {
       const result = await reviewer({
         photos: paths.map((p) => ({ data: readFileSync(p), mediaType: 'image/jpeg' as const })),
@@ -64,8 +73,9 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
       setInstanceStatus(db, row.instance_id, 'review')
     }
     await notifyEmployee(row.employee_id, 'Отправил владельцу на проверку.')
-    const fresh = getReviewRow(db, submissionId)!
-    await notifier.photosToOwner(paths, ownerReviewCaption(fresh), reviewKeyboard(submissionId))
+    const freshReview = getReviewRow(db, submissionId)!
+    const sent = await notifier.photosToOwner(paths, ownerReviewCaption(freshReview), reviewKeyboard(submissionId))
+    if (!sent) await notifier.toOwner(ownerReviewCaption(freshReview), { keyboard: reviewKeyboard(submissionId) })
   }
 
   function pump(): void {

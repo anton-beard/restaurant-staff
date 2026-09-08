@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -102,5 +102,35 @@ describe('review queue', () => {
     await q.idle()
     expect(log.length).toBe(before)
     expect(getSubmission(db, ids[0]!)?.ai_attempts).toBe(1)
+  })
+
+  it('falls back to a text notification when the photo album cannot be sent', async () => {
+    const id = submission()
+    const q = createReviewQueue({
+      db,
+      notifier: { ...fakeNotifier(log), photosToOwner: async () => false },
+      tz: 'Europe/Moscow',
+      uploadsDir,
+      reviewer: async () => ({ score: 30, verdict: 'Плохо', issues: [] }),
+      now: () => NOW,
+    })
+    q.enqueue(id)
+    await q.idle()
+    expect(log.some((n) => n.to === 'owner' && n.text.includes('Проверка:'))).toBe(true)
+  })
+
+  it('does not call the model when no photo files exist', async () => {
+    let called = 0
+    const q = queueWith(async () => { called++; return { score: 90, verdict: 'ok', issues: [] } })
+    const id = submission()
+    const inst = getSubmission(db, id)!.instance_id
+    rmSync(join(uploadsDir, String(inst)), { recursive: true, force: true })
+    // файл удалён с диска, но запись фото осталась: помечаем как deleted, чтобы очередь его не читала
+    db.prepare('update task_photos set deleted_at = ? where submission_id = ?').run(NOW.toISOString(), id)
+    q.enqueue(id)
+    await q.idle()
+    expect(called).toBe(0)
+    expect(getSubmission(db, id)).toMatchObject({ ai_status: 'failed', decision: 'needs_review' })
+    expect(log.some((n) => n.to === 'owner' && n.text.includes('ИИ недоступен'))).toBe(true)
   })
 })
