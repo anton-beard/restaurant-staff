@@ -16,12 +16,15 @@ import { authRoutes } from './api/auth.js'
 import { requireOwner } from './api/requireOwner.js'
 import { positionRoutes } from './api/positions.js'
 import { employeeRoutes } from './api/employees.js'
+import { taskRoutes } from './api/tasks.js'
+import { uploadRoutes } from './api/uploads.js'
 
 export type AppDeps = {
   config: Config
   db: Db
   auth: OwnerAuth
   notifier: Notifier
+  uploadsDir: string
   adminDistDir?: string
 }
 
@@ -61,6 +64,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     scope.addHook('preHandler', requireOwner(auth))
     scope.register(positionRoutes, { db })
     scope.register(employeeRoutes, { db })
+    scope.register(taskRoutes, { db, notifier, tz: config.TZ })
+    scope.register(uploadRoutes, { uploadsDir: deps.uploadsDir })
   })
 
   const notFound = (_req: FastifyRequest, reply: FastifyReply) =>

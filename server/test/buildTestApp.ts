@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { buildApp } from '../app.js'
 import { loadConfig } from '../config.js'
 import { openDb } from '../db/connect.js'
@@ -48,7 +51,8 @@ export async function buildTestApp() {
     },
   }
   const auth = createOwnerAuth(db)
-  const app = buildApp({ config, db, auth, notifier })
+  const uploadsDir = mkdtempSync(join(tmpdir(), 'uploads-'))
+  const app = buildApp({ config, db, auth, notifier, uploadsDir })
   await app.ready()
 
   async function loginAsOwner(): Promise<string> {
@@ -60,5 +64,5 @@ export async function buildTestApp() {
     return `${c.name}=${c.value}`
   }
 
-  return { app, db, sent, notifications, loginAsOwner }
+  return { app, db, sent, notifications, loginAsOwner, uploadsDir }
 }

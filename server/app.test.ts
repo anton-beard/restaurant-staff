@@ -29,6 +29,7 @@ describe('admin static', () => {
         db,
         auth: createOwnerAuth(db),
         notifier: fakeNotifier([]),
+        uploadsDir: mkdtempSync(join(tmpdir(), 'uploads-')),
         adminDistDir: dir,
       })
       const root = await app.inject({ method: 'GET', url: '/' })

@@ -10,6 +10,8 @@ import { buildApp } from './app.js'
 
 const config = loadConfig()
 mkdirSync(config.DATA_DIR, { recursive: true })
+const uploadsDir = join(config.DATA_DIR, 'uploads')
+mkdirSync(uploadsDir, { recursive: true })
 
 // dist/server/index.js -> ../../admin/dist; server/index.ts under tsx -> ../admin/dist.
 const adminCandidates = [
@@ -26,7 +28,7 @@ const bot = createBot({
   token: config.BOT_TOKEN,
   deps: { db, ownerPhone: config.OWNER_PHONE, publicUrl: config.PUBLIC_URL, notifier, tz: config.TZ },
 })
-const app = buildApp({ config, db, auth, notifier, adminDistDir })
+const app = buildApp({ config, db, auth, notifier, uploadsDir, adminDistDir })
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' })
 bot
