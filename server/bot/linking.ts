@@ -65,7 +65,7 @@ export function registerLinking(bot: Bot<BotContext>, deps: BotDeps): void {
     await deps.notifier.toOwner(`Сотрудник ${linked.full_name} подключился к боту.`)
   })
 
-  bot.hears([BTN.learning, BTN.quizzes, BTN.rating], async (ctx) => {
+  bot.hears(BTN.rating, async (ctx) => {
     if (!ctx.from) return
     if (roleOf(db, ctx.from.id).kind !== 'employee') return showHome(ctx, deps)
     await ctx.reply('Раздел появится в ближайшем обновлении.')

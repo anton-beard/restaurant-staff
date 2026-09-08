@@ -118,7 +118,7 @@ describe('menus', () => {
     linkTelegram(db, 1, 500)
     await bot.handleUpdate(textUpdate(500, '/start'))
     expect(lastMarkup()).toContain('Мои задания')
-    await bot.handleUpdate(textUpdate(500, 'Обучение'))
+    await bot.handleUpdate(textUpdate(500, 'Мой рейтинг'))
     expect(lastText()).toMatch(/появится/i)
   })
 

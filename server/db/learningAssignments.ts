@@ -124,6 +124,10 @@ export function getQuizAssignment(db: Db, id: number): QuizAssignment | null {
   return (db.prepare(`select ${qaCols} from quiz_assignments a where a.id = ?`).get(id) as QuizAssignment) ?? null
 }
 
+export function findQuizAssignmentForCourse(db: Db, courseAssignmentId: number): QuizAssignment | null {
+  return (db.prepare(`select ${qaCols} from quiz_assignments a where a.course_assignment_id = ?`).get(courseAssignmentId) as QuizAssignment) ?? null
+}
+
 export function getQuizAssignmentRow(db: Db, id: number): QuizAssignmentRow | null {
   return (db.prepare(`${qaRow} where a.id = ?`).get(id) as QuizAssignmentRow) ?? null
 }
