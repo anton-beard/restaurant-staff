@@ -10,6 +10,7 @@ import { seedRestaurant } from '../test/fixtures.js'
 import { seedCourse } from '../test/learning.js'
 import { callbackUpdate, textUpdate, type ApiCall } from '../test/telegram.js'
 import { CB } from './callbacks.js'
+import { resolveUpload } from './learning.js'
 import type { BotContext } from './states.js'
 
 const NOW = '2026-09-07T10:00:00.000Z'
@@ -85,5 +86,34 @@ describe('lessons', () => {
     // повторное «Дальше» на последнем уроке не создаёт второе назначение
     await bot.handleUpdate(callbackUpdate(500, CB.courseNext(a.id, 3)))
     expect(listQuizAssignments(db, { employee_id: seed.employees.ivan.id })).toHaveLength(1)
+  })
+
+  it('skips a lesson image whose path escapes uploadsDir, but still sends the lesson text and next-button prompt', async () => {
+    const a = assigned()
+    const row = getCourseAssignment(db, a.id)!
+    db.prepare('update lessons set media = ? where course_id = ? and position = 2').run(JSON.stringify([{ kind: 'image', path: '../../outside.jpg' }]), row.course_id)
+    calls.length = 0
+    await bot.handleUpdate(callbackUpdate(500, CB.courseNext(a.id, 1)))
+    expect(calls.some((c) => c.method === 'sendPhoto')).toBe(false)
+    expect(sent().some((c) => c.method === 'sendMessage' && String(c.payload.text).includes('Экстракция'))).toBe(true)
+    expect(lastText()).toBe('Нажмите, когда прочитаете.')
+  })
+})
+
+describe('resolveUpload', () => {
+  it('resolves a path inside uploadsDir', () => {
+    expect(resolveUpload('/data/uploads', 'lessons/2026-09/a.jpg')).toBe(join('/data/uploads', 'lessons/2026-09/a.jpg'))
+  })
+
+  it('rejects a path that escapes uploadsDir via ..', () => {
+    expect(resolveUpload('/data/uploads', '../secret')).toBeNull()
+  })
+
+  it('rejects an absolute path outside uploadsDir', () => {
+    expect(resolveUpload('/data/uploads', '/etc/passwd')).toBeNull()
+  })
+
+  it('rejects an empty path', () => {
+    expect(resolveUpload('/data/uploads', '')).toBeNull()
   })
 })

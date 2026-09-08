@@ -15,7 +15,7 @@ const courseBody = (positionIds: number[]) => ({
   title: 'Эспрессо по стандарту', description: 'Базовый курс', due_days: 7, pass_score: 80, position_ids: positionIds,
   lessons: [
     { title: 'Помол', body: '18 г', media: [] },
-    { title: 'Экстракция', body: '25–30 с', media: [{ kind: 'image', path: 'lessons/2026-09/a.jpg' }, { kind: 'video', url: 'https://youtu.be/x' }] },
+    { title: 'Экстракция', body: '25–30 с', media: [{ kind: 'image', path: 'lessons/2026-09/0123456789abcdef.jpg' }, { kind: 'video', url: 'https://youtu.be/x' }] },
   ],
   questions: [{ text: 'Сколько секунд?', options: ['10', '25–30'], correct_index: 1 }],
 })
@@ -60,6 +60,11 @@ describe('courses api', () => {
     const badIndex = { ...courseBody([seed.positions.barista.id]), questions: [{ text: 'x', options: ['a', 'b'], correct_index: 2 }] }
     expect((await app.inject({ method: 'POST', url: '/api/learning/courses', headers: h, payload: badIndex })).statusCode).toBe(400)
     expect((await app.inject({ method: 'GET', url: '/api/learning/courses' })).statusCode).toBe(401)
+
+    const traversal = { ...courseBody([seed.positions.barista.id]), lessons: [{ title: 'x', body: '', media: [{ kind: 'image', path: '../../etc/passwd' }] }] }
+    expect((await app.inject({ method: 'POST', url: '/api/learning/courses', headers: h, payload: traversal })).statusCode).toBe(400)
+    const validPath = { ...courseBody([seed.positions.barista.id]), lessons: [{ title: 'x', body: '', media: [{ kind: 'image', path: 'lessons/2026-09/0123456789abcdef.jpg' }] }] }
+    expect((await app.inject({ method: 'POST', url: '/api/learning/courses', headers: h, payload: validPath })).statusCode).toBe(201)
   })
 })
 

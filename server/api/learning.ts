@@ -19,7 +19,7 @@ import { nextRun, scheduleSchema } from '../tasks/schedule.js'
 type Opts = { db: Db; notifier: Notifier; tz: string; uploadsDir: string; now?: () => Date }
 
 const media = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('image'), path: z.string().min(1).max(300) }),
+  z.object({ kind: z.literal('image'), path: z.string().regex(/^lessons\/\d{4}-\d{2}\/[a-f0-9]{16}\.(jpg|png|webp)$/, 'Недопустимый путь картинки') }),
   z.object({ kind: z.literal('video'), url: z.string().url().max(500) }),
 ])
 const lesson = z.object({ title: z.string().trim().min(1).max(200), body: z.string().trim().max(5000).default(''), media: z.array(media).default([]) })

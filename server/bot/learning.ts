@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { resolve, sep } from 'node:path'
 import { InputFile, type Bot } from 'grammy'
 import { getLesson } from '../db/courses.js'
 import { getCourseQuiz } from '../db/quizzes.js'
@@ -13,6 +13,13 @@ import type { BotDeps } from './deps.js'
 import { BTN, continueCourseKeyboard, employeeMenu, nextLessonKeyboard, startQuizKeyboard } from './keyboards.js'
 import { showHome } from './linking.js'
 import { employeeOf, type BotContext } from './states.js'
+
+/** Абсолютный путь к файлу внутри uploadsDir или null, если путь выходит за его пределы. */
+export function resolveUpload(uploadsDir: string, relPath: string): string | null {
+  const root = resolve(uploadsDir)
+  const full = resolve(root, relPath)
+  return full === root || !full.startsWith(root + sep) ? null : full
+}
 
 /** Итоговый тест курса: создаётся один раз, повторный вызов возвращает существующее назначение. */
 export function ensureCourseQuizAssignment(db: Db, assignment: CourseAssignment, nowIso: string): QuizAssignment {
@@ -36,8 +43,14 @@ export async function sendLesson(ctx: BotContext, deps: BotDeps, row: CourseAssi
   }
   await ctx.reply(`Урок ${lesson.position} из ${row.lesson_count}: ${lesson.title}\n\n${lesson.body}`.trim())
   for (const m of lesson.media) {
-    if (m.kind === 'image') await ctx.replyWithPhoto(new InputFile(join(deps.uploadsDir, m.path)))
-    else await ctx.reply(m.url)
+    if (m.kind === 'image') {
+      const full = resolveUpload(deps.uploadsDir, m.path)
+      if (!full) {
+        console.warn('lesson media path rejected', m.path)
+        continue
+      }
+      await ctx.replyWithPhoto(new InputFile(full))
+    } else await ctx.reply(m.url)
   }
   await ctx.reply('Нажмите, когда прочитаете.', { reply_markup: nextLessonKeyboard(row.id, lesson.position) })
 }
