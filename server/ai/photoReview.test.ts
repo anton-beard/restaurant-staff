@@ -13,8 +13,8 @@ const input: ReviewInput = {
   criteria: 'Группы чистые, поддон пустой',
 }
 
-function fakeClient(parsed: unknown) {
-  const parse = vi.fn(async () => ({ parsed_output: parsed }))
+function fakeClient(parsed: unknown, rest: Record<string, unknown> = {}) {
+  const parse = vi.fn(async () => ({ parsed_output: parsed, ...rest }))
   return { client: { messages: { parse } } as unknown as Anthropic, parse }
 }
 
@@ -33,20 +33,29 @@ describe('buildMessages', () => {
 })
 
 describe('reviewPhotos', () => {
-  it('passes model, cached system prompt and structured output, returns parsed result', async () => {
+  it('passes model, system prompt and structured output, returns parsed result', async () => {
     const { client, parse } = fakeClient({ score: 87, verdict: 'Чисто', issues: [] })
     const result = await reviewPhotos(input, { client, model: 'claude-sonnet-5' })
     expect(result).toEqual({ score: 87, verdict: 'Чисто', issues: [] })
     const params = parse.mock.calls[0]![0] as Record<string, unknown>
     expect(params.model).toBe('claude-sonnet-5')
-    expect(JSON.stringify(params.system)).toContain(SYSTEM_PROMPT.slice(0, 40))
-    expect(JSON.stringify(params.system)).toContain('ephemeral')
+    expect(params.system).toBe(SYSTEM_PROMPT)
+    expect(params.max_tokens).toBe(4000)
     expect(params.output_config).toMatchObject({ effort: 'low' })
     expect((params.output_config as { format?: unknown }).format).toBeDefined()
   })
 
-  it('throws when the model returned nothing parseable', async () => {
-    const { client } = fakeClient(null)
+  it('throws with the stop reason when the model returned nothing parseable', async () => {
+    const { client } = fakeClient(null, { stop_reason: 'refusal', stop_details: { type: 'refusal', category: 'cyber' } })
     await expect(reviewPhotos(input, { client, model: 'm' })).rejects.toThrow(/structured/)
+    await expect(reviewPhotos(input, { client, model: 'm' })).rejects.toThrow(/refusal/)
+    await expect(reviewPhotos(input, { client, model: 'm' })).rejects.toThrow(/cyber/)
+  })
+
+  it('reports a missing stop_details without trailing noise', async () => {
+    const { client } = fakeClient(null, { stop_reason: 'max_tokens', stop_details: null })
+    await expect(reviewPhotos(input, { client, model: 'm' })).rejects.toThrow(
+      'claude returned no structured output (stop_reason=max_tokens)',
+    )
   })
 })

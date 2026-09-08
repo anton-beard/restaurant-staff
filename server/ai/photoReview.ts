@@ -48,15 +48,20 @@ export async function reviewPhotos(input: ReviewInput, deps: { client: Anthropic
   const response = await deps.client.messages.parse(
     {
       model: deps.model,
-      max_tokens: 2000,
+      max_tokens: 4000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'low', format: zodOutputFormat(reviewSchema) },
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      // Промпт ~150 токенов, ниже минимума кэширования (1024+); cache_control включать только если он вырастет
+      system: SYSTEM_PROMPT,
       messages: buildMessages(input),
     },
     { timeout: 60_000 },
   )
-  if (!response.parsed_output) throw new Error('claude returned no structured output')
+  if (!response.parsed_output) {
+    throw new Error(
+      `claude returned no structured output (stop_reason=${response.stop_reason}${response.stop_details ? ', ' + JSON.stringify(response.stop_details) : ''})`,
+    )
+  }
   return response.parsed_output
 }
 

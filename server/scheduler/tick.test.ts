@@ -55,6 +55,18 @@ describe('issueDueTemplates', () => {
     expect(getTaskTemplate(db, t.id)?.next_run_at).toBe('2026-09-08T19:00:00.000Z')
   })
 
+  it('keeps issuing the remaining templates when one template fails', async () => {
+    // слот пропущен больше чем на час, поэтому выдачи не будет — упадёт только расчёт следующего запуска
+    const broken = createTaskTemplate(db, tpl({ title: 'Сломанное расписание' }), '2026-09-07T17:00:00.000Z')
+    const ok = createTaskTemplate(db, tpl(), '2026-09-07T19:00:00.000Z')
+    // расписание разбирается как JSON, но nextRun на нём падает: «schedule has no upcoming slot»
+    db.prepare('update task_templates set schedule = ? where id = ?').run('{"kind":"weekly","days":[],"times":["22:00"]}', broken.id)
+    expect(await issueDueTemplates(deps, T('2026-09-07T19:00:30.000Z'))).toBe(2)
+    expect(listInstances(db, {}).every((i) => i.title === 'Помыть кофемашину')).toBe(true)
+    expect(getTaskTemplate(db, broken.id)?.next_run_at).toBe('2026-09-07T17:00:00.000Z')
+    expect(getTaskTemplate(db, ok.id)?.next_run_at).toBe('2026-09-08T19:00:00.000Z')
+  })
+
   it('ignores one-off templates', async () => {
     createTaskTemplate(db, tpl({ schedule: null }), null)
     expect(await issueDueTemplates(deps, T('2026-09-07T19:00:30.000Z'))).toBe(0)
