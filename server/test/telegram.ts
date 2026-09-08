@@ -1,4 +1,4 @@
-import { Bot, type Api } from 'grammy'
+import { Bot, type Api, type Context } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 
 export const botInfo: UserFromGetMe = {
@@ -51,7 +51,7 @@ type Responder = (payload: Record<string, unknown>) => unknown
 let messageCounter = 100
 
 export function captureApi(
-  target: Api | Bot<any>,
+  target: Api | Bot<Context>,
   responders: Record<string, Responder> = {},
   calls: ApiCall[] = [],
 ): ApiCall[] {

@@ -44,7 +44,8 @@ onMounted(async () => {
   }
   await load()
 })
-watch(tab, () => { filters.status = ''; void load() })
+// один запрос на переключение вкладки: сброс статуса сам вызовет загрузку через наблюдатель фильтров
+watch(tab, () => { if (filters.status) filters.status = ''; else void load() })
 watch(filters, load, { deep: true })
 </script>
 
