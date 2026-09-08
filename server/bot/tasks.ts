@@ -150,9 +150,8 @@ export function registerTasks(bot: Bot, deps: BotDeps): void {
     await ctx.reply(`Фото ${n} из 3 получено.`)
   })
 
-  bot.hears(BTN.photosDone, async (ctx, next) => {
-    const state = collecting(deps, ctx.from!.id)
-    if (!state) return next()
+  /** Завершает сбор фото: создаёт сдачу и отправляет её на проверку. */
+  async function finishCollection(ctx: Context, state: CollectingState): Promise<void> {
     if (state.photos.length === 0) {
       await ctx.reply('Нужно хотя бы одно фото.')
       return
@@ -168,13 +167,40 @@ export function registerTasks(bot: Bot, deps: BotDeps): void {
     clearState(db, ctx.from!.id)
     await ctx.reply('Проверяю, это займёт до минуты.', { reply_markup: employeeMenu() })
     deps.onSubmission(submission.id)
+  }
+
+  /** Отменяет сбор фото и удаляет уже загруженные файлы. */
+  async function cancelCollection(ctx: Context, state: CollectingState): Promise<void> {
+    for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
+    clearState(db, ctx.from!.id)
+    await ctx.reply('Отменено.', { reply_markup: employeeMenu() })
+  }
+
+  bot.hears(BTN.photosDone, async (ctx, next) => {
+    const state = collecting(deps, ctx.from!.id)
+    if (!state) return next()
+    await finishCollection(ctx, state)
   })
 
   bot.hears(BTN.cancel, async (ctx, next) => {
     const state = collecting(deps, ctx.from!.id)
     if (!state) return next()
-    for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
-    clearState(db, ctx.from!.id)
-    await ctx.reply('Отменено.', { reply_markup: employeeMenu() })
+    await cancelCollection(ctx, state)
+  })
+
+  // Пока идёт сбор фото, любое постороннее сообщение не должно проваливаться в главное меню:
+  // оно снесло бы клавиатуру «Готово»/«Отмена». Обработчик фото зарегистрирован выше и
+  // при активном состоянии сам завершает обновление, поэтому сюда фото не доходят.
+  bot.on('message', async (ctx, next) => {
+    if (!ctx.from) return next()
+    const state = collecting(deps, ctx.from.id)
+    if (!state) return next()
+    if (ctx.message.photo) return next()
+    const text = ctx.message.text?.trim().toLowerCase()
+    if (text === BTN.photosDone.toLowerCase()) return finishCollection(ctx, state)
+    if (text === BTN.cancel.toLowerCase()) return cancelCollection(ctx, state)
+    await ctx.reply('Сейчас идёт отправка фото. Пришлите фото, затем нажмите Готово, или нажмите Отмена.', {
+      reply_markup: photoCollectKeyboard(),
+    })
   })
 }

@@ -11,6 +11,7 @@ import { makeBot } from '../test/bot.js'
 import { seedRestaurant } from '../test/fixtures.js'
 import { callbackUpdate, photoUpdate, textUpdate, type ApiCall } from '../test/telegram.js'
 import { CB } from './callbacks.js'
+import type { CollectingState } from './tasks.js'
 
 const NOW = '2026-09-07T19:00:00.000Z'
 const DUE = '2026-09-07T20:00:00.000Z'
@@ -124,6 +125,36 @@ describe('photo collection', () => {
     expect(listPhotos(db, 1)).toHaveLength(3)
     expect(getInstance(db, instId)?.status).toBe('submitted')
     expect(getState(db, 500)).toBeNull()
+  })
+
+  it('keeps the collection alive when a stray message arrives', async () => {
+    await bot.handleUpdate(callbackUpdate(500, CB.photo(instId)))
+    await bot.handleUpdate(photoUpdate(500, 'f1', 'u1'))
+    await bot.handleUpdate(textUpdate(500, 'привет'))
+    expect(lastText()).toBe('Сейчас идёт отправка фото. Пришлите фото, затем нажмите Готово, или нажмите Отмена.')
+    expect(JSON.stringify(calls.at(-1)!.payload.reply_markup)).toContain('Готово')
+    expect(getState<CollectingState>(db, 500)?.kind).toBe('collecting_photos')
+    expect(getState<CollectingState>(db, 500)?.photos).toHaveLength(1)
+  })
+
+  it('accepts Готово with stray spaces and mixed case', async () => {
+    await bot.handleUpdate(callbackUpdate(500, CB.photo(instId)))
+    await bot.handleUpdate(photoUpdate(500, 'f1', 'u1'))
+    await bot.handleUpdate(textUpdate(500, ' гОтОво '))
+    expect(lastText()).toBe('Проверяю, это займёт до минуты.')
+    expect(submitted).toEqual([1])
+    expect(getInstance(db, instId)?.status).toBe('submitted')
+    expect(listPhotos(db, 1)).toHaveLength(1)
+    expect(getState(db, 500)).toBeNull()
+  })
+
+  it('accepts Отмена in upper case', async () => {
+    await bot.handleUpdate(callbackUpdate(500, CB.photo(instId)))
+    await bot.handleUpdate(photoUpdate(500, 'f1', 'u1'))
+    await bot.handleUpdate(textUpdate(500, 'ОТМЕНА'))
+    expect(lastText()).toBe('Отменено.')
+    expect(getState(db, 500)).toBeNull()
+    expect(getInstance(db, instId)?.status).toBe('pending')
   })
 
   it('cancel removes files and state', async () => {
