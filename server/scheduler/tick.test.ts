@@ -15,7 +15,7 @@ import { issueDueTemplates } from './issueDue.js'
 import { sendReminders } from './reminders.js'
 import { markOverdue } from './overdue.js'
 import { retryStaleReviews } from './retryReviews.js'
-import { cleanup } from './cleanup.js'
+import { cleanup, PHOTO_RETENTION_KEY } from './cleanup.js'
 
 let db: Db
 let seed: ReturnType<typeof seedRestaurant>
@@ -36,7 +36,7 @@ beforeEach(() => {
   setSetting(db, OWNER_TELEGRAM_ID, '42')
   log = []
   enqueued = []
-  deps = { db, notifier: fakeNotifier(log), tz: 'Europe/Moscow', uploadsDir: mkdtempSync(join(tmpdir(), 'sch-')), reviewQueue: { enqueue: (id) => enqueued.push(id) } }
+  deps = { db, notifier: fakeNotifier(log), tz: 'Europe/Moscow', uploadsDir: mkdtempSync(join(tmpdir(), 'sch-')), reviewQueue: { enqueue: (id) => { enqueued.push(id); return true } } }
 })
 
 describe('issueDueTemplates', () => {
@@ -109,6 +109,26 @@ describe('retryStaleReviews', () => {
     expect(getInstance(db, i2.id)?.status).toBe('review')
     expect(log.some((n) => n.to === 'owner' && n.text.includes('ИИ недоступен'))).toBe(true)
   })
+
+  it('falls back to a text notification when the exhausted submission photo album cannot be sent', async () => {
+    const t = createTaskTemplate(db, tpl(), null)
+    const i = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: '2026-09-07T10:00:00.000Z', issued_at: '2026-09-07T10:00:00.000Z', due_at: '2026-09-07T11:00:00.000Z', status: 'submitted' })!
+    const sub = createSubmission(db, i.id, '2026-09-07T10:50:00.000Z', [{ path: 'a.jpg', fileUniqueId: 'u1' }])
+    markAiStarted(db, sub.id)
+    markAiStarted(db, sub.id)
+    markAiStarted(db, sub.id)
+    const failingDeps: SchedulerDeps = { ...deps, notifier: { ...fakeNotifier(log), photosToOwner: async () => false } }
+    expect(await retryStaleReviews(failingDeps, T('2026-09-07T11:10:00.000Z'))).toEqual({ retried: 0, failed: 1 })
+    expect(log.some((n) => n.to === 'owner' && n.text.includes('ИИ недоступен'))).toBe(true)
+  })
+
+  it('counts retried only for submissions the queue actually accepted', async () => {
+    const t = createTaskTemplate(db, tpl(), null)
+    const i1 = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: '2026-09-07T10:00:00.000Z', issued_at: '2026-09-07T10:00:00.000Z', due_at: '2026-09-07T11:00:00.000Z', status: 'submitted' })!
+    createSubmission(db, i1.id, '2026-09-07T10:50:00.000Z', [{ path: 'a.jpg', fileUniqueId: 'u1' }])
+    const rejectingDeps: SchedulerDeps = { ...deps, reviewQueue: { enqueue: () => false } }
+    expect(await retryStaleReviews(rejectingDeps, T('2026-09-07T11:00:00.000Z'))).toEqual({ retried: 0, failed: 0 })
+  })
 })
 
 describe('cleanup', () => {
@@ -129,6 +149,20 @@ describe('cleanup', () => {
     expect(existsSync(join(deps.uploadsDir, rel))).toBe(false)
     expect(getSubmission(db, s.id)).not.toBeNull()
     expect(auth.hasSession(token)).toBe(false)
+  })
+
+  it('falls back to the default retention when the setting is not a valid positive number', async () => {
+    const t = createTaskTemplate(db, tpl(), null)
+    const i = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: '2026-08-08T10:00:00.000Z', issued_at: '2026-08-08T10:00:00.000Z', due_at: '2026-08-08T11:00:00.000Z', status: 'accepted' })!
+    mkdirSync(join(deps.uploadsDir, String(i.id)), { recursive: true })
+    const rel = join(String(i.id), 'recent.jpg')
+    writeFileSync(join(deps.uploadsDir, rel), 'x')
+    createSubmission(db, i.id, '2026-08-08T10:30:00.000Z', [{ path: rel, fileUniqueId: 'u1' }])
+    setSetting(db, PHOTO_RETENTION_KEY, '')
+    // фото 30-дневной давности, порог по умолчанию 90 дней — должно остаться
+    const r = await cleanup(deps, T('2026-09-07T10:00:00.000Z'))
+    expect(r.photos).toBe(0)
+    expect(existsSync(join(deps.uploadsDir, rel))).toBe(true)
   })
 })
 

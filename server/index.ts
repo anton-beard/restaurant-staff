@@ -13,15 +13,16 @@ import { createScheduler } from './scheduler/tick.js'
 import { buildApp } from './app.js'
 
 const config = loadConfig()
-mkdirSync(config.DATA_DIR, { recursive: true })
-const uploadsDir = join(config.DATA_DIR, 'uploads')
+const dataDir = resolve(config.DATA_DIR)
+mkdirSync(dataDir, { recursive: true })
+const uploadsDir = join(dataDir, 'uploads')
 mkdirSync(uploadsDir, { recursive: true })
 
 // dist/server/index.js -> ../../admin/dist; server/index.ts under tsx -> ../admin/dist.
 const adminCandidates = [resolve(import.meta.dirname, '../../admin/dist'), resolve(import.meta.dirname, '../admin/dist')]
 const adminDistDir = adminCandidates.find(existsSync) ?? adminCandidates[0]!
 
-const db = openDb(join(config.DATA_DIR, 'app.db'))
+const db = openDb(join(dataDir, 'app.db'))
 const auth = createOwnerAuth(db)
 const api = new Api(config.BOT_TOKEN)
 const notifier = createTelegramNotifier(api, db)

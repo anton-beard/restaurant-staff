@@ -14,8 +14,7 @@ export async function retryStaleReviews(deps: SchedulerDeps, now: Date): Promise
   const before = new Date(now.getTime() - STALE_REVIEW_MS).toISOString()
   for (const s of listStaleAiPending(deps.db, before)) {
     if (s.ai_attempts < MAX_AI_ATTEMPTS) {
-      deps.reviewQueue.enqueue(s.id)
-      retried++
+      if (deps.reviewQueue.enqueue(s.id)) retried++
       continue
     }
     markAiFailed(deps.db, s.id, now.toISOString())
@@ -24,7 +23,9 @@ export async function retryStaleReviews(deps: SchedulerDeps, now: Date): Promise
     const row = getReviewRow(deps.db, s.id)
     if (!row) continue
     const paths = listPhotos(deps.db, s.id).filter((p) => !p.deleted_at).map((p) => join(deps.uploadsDir, p.path))
-    await deps.notifier.photosToOwner(paths, ownerReviewCaption(row), reviewKeyboard(s.id))
+    const caption = ownerReviewCaption(row)
+    const sent = await deps.notifier.photosToOwner(paths, caption, reviewKeyboard(s.id))
+    if (!sent) await deps.notifier.toOwner(caption, { keyboard: reviewKeyboard(s.id) })
   }
   return { retried, failed }
 }

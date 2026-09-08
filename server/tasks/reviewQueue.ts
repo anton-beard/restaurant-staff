@@ -10,7 +10,7 @@ import type { Reviewer } from '../ai/photoReview.js'
 import { reviewKeyboard } from '../bot/keyboards.js'
 import { decideByScore, ownerReviewCaption } from './decide.js'
 
-export type ReviewQueue = { enqueue(submissionId: number): void; size(): number; idle(): Promise<void> }
+export type ReviewQueue = { enqueue(submissionId: number): boolean; size(): number; idle(): Promise<void> }
 export type ReviewQueueDeps = {
   db: Db
   notifier: Notifier
@@ -37,10 +37,15 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
 
   async function process(submissionId: number): Promise<void> {
     const sub = getSubmission(db, submissionId)
-    if (!sub || sub.decision !== null) return
+    if (!sub) return
+    if (sub.decision !== null) return
     const row = getReviewRow(db, submissionId)
     const template = row ? getTaskTemplate(db, row.template_id) : null
-    if (!row || !template) return
+    if (!row || !template) {
+      console.warn('photo review: submission has no instance/template', submissionId)
+      markAiFailed(db, submissionId, now().toISOString())
+      return
+    }
     const photos = listPhotos(db, submissionId).filter((p) => p.deleted_at === null)
     const paths = photos.map((p) => join(uploadsDir, p.path))
     if (paths.length === 0) {
@@ -102,9 +107,10 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
 
   return {
     enqueue(submissionId) {
-      if (waiting.includes(submissionId) || active.has(submissionId)) return
+      if (waiting.includes(submissionId) || active.has(submissionId)) return false
       waiting.push(submissionId)
       pump()
+      return true
     },
     size: () => waiting.length + running,
     idle: () =>

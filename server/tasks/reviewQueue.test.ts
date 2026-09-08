@@ -144,4 +144,15 @@ describe('review queue', () => {
     await q.idle()
     expect(calls).toBe(1)
   })
+
+  it('enqueue reports whether the id was accepted', async () => {
+    const q = queueWith(async () => ({ score: 90, verdict: 'ok', issues: [] }))
+    const id = submission()
+    expect(q.enqueue(id)).toBe(true)
+    expect(q.enqueue(id)).toBe(false)
+    await q.idle()
+    // сдача уже решена, но принять в очередь можно — process() сам её пропустит
+    expect(q.enqueue(id)).toBe(true)
+    await q.idle()
+  })
 })

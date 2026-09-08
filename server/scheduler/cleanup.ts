@@ -9,7 +9,8 @@ export const DEFAULT_RETENTION_DAYS = 90
 export const PHOTO_RETENTION_KEY = 'photo_retention_days'
 
 export async function cleanup(deps: SchedulerDeps, now: Date): Promise<{ photos: number; sessions: number; codes: number }> {
-  const days = Number(getSetting(deps.db, PHOTO_RETENTION_KEY) ?? DEFAULT_RETENTION_DAYS)
+  const raw = Number(getSetting(deps.db, PHOTO_RETENTION_KEY))
+  const days = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RETENTION_DAYS
   const before = new Date(now.getTime() - days * 24 * 60 * 60_000).toISOString()
   let photos = 0
   for (const p of listPhotosOlderThan(deps.db, before)) {
