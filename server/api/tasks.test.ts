@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildTestApp } from '../test/buildTestApp.js'
 import { seedRestaurant } from '../test/fixtures.js'
+import { createInstance } from '../db/taskInstances.js'
+import { createSubmission, saveAiResult } from '../db/taskSubmissions.js'
 
 async function setup() {
   const t = await buildTestApp()
@@ -84,6 +86,32 @@ describe('task templates api', () => {
   it('requires a session', async () => {
     const { app } = await setup()
     expect((await app.inject({ method: 'GET', url: '/api/tasks/templates' })).statusCode).toBe(401)
+  })
+})
+
+describe('review queue api', () => {
+  it('lists the queue and applies decisions once', async () => {
+    const { app, seed, h, db, notifications } = await setup()
+    const create = await app.inject({ method: 'POST', url: '/api/tasks/templates', headers: h, payload: weeklyBody(seed) })
+    const templateId = create.json().template.id
+    const inst = createInstance(db, { template_id: templateId, employee_id: seed.employees.ivan.id, slot_at: '2026-09-07T19:00:00.000Z', issued_at: '2026-09-07T19:00:00.000Z', due_at: '2026-09-07T20:00:00.000Z', status: 'review' })!
+    const sub = createSubmission(db, inst.id, '2026-09-07T19:10:00.000Z', [{ path: '1/a.jpg', fileUniqueId: 'u1' }])
+    saveAiResult(db, sub.id, { score: 45, verdict: 'Грязно', issues: ['поддон'] }, 'needs_review', '2026-09-07T19:11:00.000Z')
+
+    const queue = await app.inject({ method: 'GET', url: '/api/tasks/review-queue', headers: h })
+    expect(queue.json()).toHaveLength(1)
+    expect(queue.json()[0]).toMatchObject({ id: sub.id, title: 'Помыть кофемашину', employee_name: 'Иван Петров', ai_score: 45 })
+    expect(queue.json()[0].photos[0].path).toBe('1/a.jpg')
+
+    const bad = await app.inject({ method: 'POST', url: `/api/tasks/submissions/${sub.id}/decide`, headers: h, payload: { decision: 'reject' } })
+    expect(bad.statusCode).toBe(400)
+    const ok = await app.inject({ method: 'POST', url: `/api/tasks/submissions/${sub.id}/decide`, headers: h, payload: { decision: 'reject', comment: 'Поддон' } })
+    expect(ok.statusCode).toBe(200)
+    expect(notifications.some((n) => n.to === 500 && n.text.includes('Поддон'))).toBe(true)
+    const again = await app.inject({ method: 'POST', url: `/api/tasks/submissions/${sub.id}/decide`, headers: h, payload: { decision: 'accept' } })
+    expect(again.statusCode).toBe(409)
+    expect((await app.inject({ method: 'POST', url: '/api/tasks/submissions/999/decide', headers: h, payload: { decision: 'accept' } })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'GET', url: '/api/tasks/review-queue', headers: h })).json()).toEqual([])
   })
 })
 

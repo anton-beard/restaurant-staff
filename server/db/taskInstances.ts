@@ -113,3 +113,7 @@ export function listOverdueCandidates(db: Db, nowIso: string): TaskInstance[] {
     .prepare(`select ${cols} from task_instances i where i.status in ('open', 'pending') and i.due_at < ? order by i.due_at`)
     .all(nowIso) as TaskInstance[]
 }
+
+export function countOverdueSince(db: Db, sinceIso: string): number {
+  return (db.prepare("select count(*) c from task_instances where status = 'overdue' and due_at >= ?").get(sinceIso) as { c: number }).c
+}

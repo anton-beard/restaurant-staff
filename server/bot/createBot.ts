@@ -3,6 +3,7 @@ import type { UserFromGetMe } from 'grammy/types'
 import { normalizePhone } from '../lib/phone.js'
 import type { BotDeps } from './deps.js'
 import { registerFallback, registerLinking } from './linking.js'
+import { registerReview } from './review.js'
 import { registerTasks } from './tasks.js'
 
 export type BotOptions = { token: string; botInfo?: UserFromGetMe; deps: BotDeps }
@@ -16,6 +17,7 @@ export function createBot(opts: BotOptions): Bot {
 
   registerLinking(bot, deps)
   registerTasks(bot, deps)
+  registerReview(bot, deps)
   registerFallback(bot, deps)
 
   bot.catch(async (err) => {

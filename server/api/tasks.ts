@@ -5,9 +5,10 @@ import {
   createTaskTemplate, getTaskTemplate, listTaskTemplates, setTemplateActive, updateTaskTemplate, type TaskTemplateInput,
 } from '../db/taskTemplates.js'
 import { getInstanceRow, listInstances } from '../db/taskInstances.js'
-import { listSubmissionsForInstance } from '../db/taskSubmissions.js'
+import { listReviewQueue, listSubmissionsForInstance } from '../db/taskSubmissions.js'
 import { idParams, parse } from '../lib/validate.js'
 import type { Notifier } from '../notify.js'
+import { applyOwnerDecision } from '../tasks/decide.js'
 import { issueTemplate } from '../tasks/issue.js'
 import { nextRun, scheduleSchema } from '../tasks/schedule.js'
 
@@ -37,6 +38,12 @@ const templateBody = z
     if (b.assignee_mode === 'by_employees' && b.employee_ids.length === 0) {
       ctx.addIssue({ code: 'custom', path: ['employee_ids'], message: 'Выберите хотя бы одного сотрудника' })
     }
+  })
+
+const decideBody = z
+  .object({ decision: z.enum(['accept', 'reject']), comment: z.string().trim().max(1000).optional() })
+  .superRefine((b, ctx) => {
+    if (b.decision === 'reject' && !b.comment) ctx.addIssue({ code: 'custom', path: ['comment'], message: 'Напишите комментарий' })
   })
 
 const listQuery = z.object({ includeInactive: z.string().optional() })
@@ -104,5 +111,15 @@ export const taskRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     const instance = getInstanceRow(db, id)
     if (!instance) return reply.code(404).send({ error: 'not_found' })
     return { instance, submissions: listSubmissionsForInstance(db, id) }
+  })
+
+  app.get('/api/tasks/review-queue', async () => listReviewQueue(db))
+
+  app.post('/api/tasks/submissions/:id/decide', async (req, reply) => {
+    const { id } = parse(idParams, req.params)
+    const body = parse(decideBody, req.body)
+    const r = await applyOwnerDecision({ db, notifier, tz }, id, body.decision, body.comment ?? null, now())
+    if (!r.ok) return reply.code(r.reason === 'not_found' ? 404 : 409).send({ error: r.reason })
+    return { ok: true }
   })
 }
