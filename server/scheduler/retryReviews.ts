@@ -13,6 +13,8 @@ export async function retryStaleReviews(deps: SchedulerDeps, now: Date): Promise
   let failed = 0
   const before = new Date(now.getTime() - STALE_REVIEW_MS).toISOString()
   for (const s of listStaleAiPending(deps.db, before)) {
+    // запрос к модели ещё в очереди или в полёте: он сам допишет результат, вмешиваться нельзя
+    if (deps.reviewQueue.isActive(s.id)) continue
     if (s.ai_attempts < MAX_AI_ATTEMPTS) {
       if (deps.reviewQueue.enqueue(s.id)) retried++
       continue

@@ -9,7 +9,7 @@ export function decideByScore(score: number, threshold: number): 'auto_accepted'
   return score >= threshold ? 'auto_accepted' : 'needs_review'
 }
 
-export type DecisionDeps = { db: Db; notifier: Notifier; tz: string }
+export type DecisionDeps = { db: Db; notifier: Notifier }
 export type OwnerDecisionResult = { ok: true; instanceId: number } | { ok: false; reason: 'not_found' | 'already_decided' }
 
 export async function applyOwnerDecision(

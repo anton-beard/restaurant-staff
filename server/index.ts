@@ -29,7 +29,6 @@ const notifier = createTelegramNotifier(api, db)
 const reviewQueue = createReviewQueue({
   db,
   notifier,
-  tz: config.TZ,
   uploadsDir,
   reviewer: createReviewer(config.ANTHROPIC_API_KEY, config.AI_MODEL),
 })

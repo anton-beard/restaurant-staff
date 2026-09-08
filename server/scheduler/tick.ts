@@ -12,7 +12,7 @@ export type SchedulerDeps = {
   notifier: Notifier
   tz: string
   uploadsDir: string
-  reviewQueue: Pick<ReviewQueue, 'enqueue'>
+  reviewQueue: Pick<ReviewQueue, 'enqueue' | 'isActive'>
   now?: () => Date
 }
 export type Scheduler = { tick(): Promise<void>; start(intervalMs?: number): () => void }

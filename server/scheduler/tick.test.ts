@@ -36,7 +36,7 @@ beforeEach(() => {
   setSetting(db, OWNER_TELEGRAM_ID, '42')
   log = []
   enqueued = []
-  deps = { db, notifier: fakeNotifier(log), tz: 'Europe/Moscow', uploadsDir: mkdtempSync(join(tmpdir(), 'sch-')), reviewQueue: { enqueue: (id) => { enqueued.push(id); return true } } }
+  deps = { db, notifier: fakeNotifier(log), tz: 'Europe/Moscow', uploadsDir: mkdtempSync(join(tmpdir(), 'sch-')), reviewQueue: { enqueue: (id) => { enqueued.push(id); return true }, isActive: () => false } }
 })
 
 describe('issueDueTemplates', () => {
@@ -122,11 +122,26 @@ describe('retryStaleReviews', () => {
     expect(log.some((n) => n.to === 'owner' && n.text.includes('ИИ недоступен'))).toBe(true)
   })
 
+  it('leaves submissions the queue is still working on alone', async () => {
+    const t = createTaskTemplate(db, tpl(), null)
+    const i = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: '2026-09-07T10:00:00.000Z', issued_at: '2026-09-07T10:00:00.000Z', due_at: '2026-09-07T11:00:00.000Z', status: 'submitted' })!
+    const sub = createSubmission(db, i.id, '2026-09-07T10:50:00.000Z', [{ path: 'a.jpg', fileUniqueId: 'u1' }])
+    markAiStarted(db, sub.id)
+    markAiStarted(db, sub.id)
+    markAiStarted(db, sub.id)
+    const busyDeps: SchedulerDeps = { ...deps, reviewQueue: { enqueue: (id) => { enqueued.push(id); return true }, isActive: () => true } }
+    // попытки исчерпаны, но запрос к модели ещё в полёте: ни повтора, ни отметки о сбое
+    expect(await retryStaleReviews(busyDeps, T('2026-09-07T11:10:00.000Z'))).toEqual({ retried: 0, failed: 0 })
+    expect(enqueued).toEqual([])
+    expect(getSubmission(db, sub.id)).toMatchObject({ ai_status: 'pending', decision: null })
+    expect(log).toEqual([])
+  })
+
   it('counts retried only for submissions the queue actually accepted', async () => {
     const t = createTaskTemplate(db, tpl(), null)
     const i1 = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: '2026-09-07T10:00:00.000Z', issued_at: '2026-09-07T10:00:00.000Z', due_at: '2026-09-07T11:00:00.000Z', status: 'submitted' })!
     createSubmission(db, i1.id, '2026-09-07T10:50:00.000Z', [{ path: 'a.jpg', fileUniqueId: 'u1' }])
-    const rejectingDeps: SchedulerDeps = { ...deps, reviewQueue: { enqueue: () => false } }
+    const rejectingDeps: SchedulerDeps = { ...deps, reviewQueue: { enqueue: () => false, isActive: () => false } }
     expect(await retryStaleReviews(rejectingDeps, T('2026-09-07T11:00:00.000Z'))).toEqual({ retried: 0, failed: 0 })
   })
 })

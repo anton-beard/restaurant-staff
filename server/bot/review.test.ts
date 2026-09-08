@@ -64,6 +64,21 @@ describe('owner review in bot', () => {
     expect(getState(db, 42)).toBeNull()
   })
 
+  it('drops the review buttons as soon as comment mode starts', async () => {
+    await bot.handleUpdate(callbackUpdate(42, CB.reject(subId)))
+    expect(calls.some((c) => c.method === 'editMessageReplyMarkup' && c.payload.chat_id === 42)).toBe(true)
+  })
+
+  it('asks again when the comment is only whitespace', async () => {
+    await bot.handleUpdate(callbackUpdate(42, CB.reject(subId)))
+    await bot.handleUpdate(textUpdate(42, '   '))
+    // подсказка приходит второй раз: первая была при входе в режим комментария
+    expect(texts().filter((t) => t.text === 'Напишите комментарий для сотрудника.')).toHaveLength(2)
+    expect(JSON.stringify(calls.at(-1)!.payload.reply_markup)).toContain('Отмена')
+    expect(getState<{ kind: string }>(db, 42)?.kind).toBe('reject_comment')
+    expect(getSubmission(db, subId)?.decision).toBe('needs_review')
+  })
+
   it('cancel leaves the comment mode without deciding', async () => {
     await bot.handleUpdate(callbackUpdate(42, CB.reject(subId)))
     await bot.handleUpdate(textUpdate(42, 'Отмена'))

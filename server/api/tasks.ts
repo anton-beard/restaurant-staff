@@ -118,7 +118,7 @@ export const taskRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
   app.post('/api/tasks/submissions/:id/decide', async (req, reply) => {
     const { id } = parse(idParams, req.params)
     const body = parse(decideBody, req.body)
-    const r = await applyOwnerDecision({ db, notifier, tz }, id, body.decision, body.comment ?? null, now())
+    const r = await applyOwnerDecision({ db, notifier }, id, body.decision, body.comment ?? null, now())
     if (!r.ok) return reply.code(r.reason === 'not_found' ? 404 : 409).send({ error: r.reason })
     return { ok: true }
   })

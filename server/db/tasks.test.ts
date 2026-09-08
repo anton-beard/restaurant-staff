@@ -165,10 +165,19 @@ describe('submissions', () => {
     expect(listReviewQueue(db)).toEqual([])
   })
 
+  it('ai writes lose to an already made decision', () => {
+    const s = createSubmission(db, instanceId, NOW, [{ path: 'a.jpg', fileUniqueId: 'u1' }])
+    expect(saveAiResult(db, s.id, { score: 91, verdict: 'ok', issues: [] }, 'auto_accepted', NOW)).toBe(true)
+    // решение уже есть: повторный результат ИИ и отметка о сбое не должны его перезаписывать
+    expect(saveAiResult(db, s.id, { score: 10, verdict: 'плохо', issues: ['x'] }, 'needs_review', NOW)).toBe(false)
+    expect(markAiFailed(db, s.id, NOW)).toBe(false)
+    expect(getSubmission(db, s.id)).toMatchObject({ ai_status: 'done', ai_score: 91, decision: 'auto_accepted' })
+  })
+
   it('failed ai goes to review; stale pending is listed', () => {
     const s = createSubmission(db, instanceId, '2026-09-07T09:50:00.000Z', [{ path: 'a.jpg', fileUniqueId: 'u1' }])
     expect(listStaleAiPending(db, '2026-09-07T09:57:00.000Z').map((x) => x.id)).toEqual([s.id])
-    markAiFailed(db, s.id, NOW)
+    expect(markAiFailed(db, s.id, NOW)).toBe(true)
     expect(getSubmission(db, s.id)).toMatchObject({ ai_status: 'failed', decision: 'needs_review' })
     expect(listStaleAiPending(db, NOW)).toEqual([])
   })

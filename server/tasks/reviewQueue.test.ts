@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDb, type Db } from '../db/connect.js'
-import { createInstance, getInstance } from '../db/taskInstances.js'
+import { createInstance, getInstance, setInstanceStatus } from '../db/taskInstances.js'
 import { createTaskTemplate } from '../db/taskTemplates.js'
-import { createSubmission, getSubmission } from '../db/taskSubmissions.js'
+import { createSubmission, getSubmission, markAiFailed, setOwnerDecision } from '../db/taskSubmissions.js'
 import { OWNER_TELEGRAM_ID, setSetting } from '../db/settings.js'
 import { fakeNotifier, type Notification } from '../test/buildTestApp.js'
 import { seedRestaurant } from '../test/fixtures.js'
@@ -47,7 +47,7 @@ beforeEach(() => {
 })
 
 const queueWith = (reviewer: (i: ReviewInput) => Promise<ReviewResult>, concurrency = 2) =>
-  createReviewQueue({ db, notifier: fakeNotifier(log), tz: 'Europe/Moscow', uploadsDir, reviewer, concurrency, now: () => NOW })
+  createReviewQueue({ db, notifier: fakeNotifier(log), uploadsDir, reviewer, concurrency, now: () => NOW })
 
 describe('review queue', () => {
   it('auto-accepts above the threshold and tells the employee', async () => {
@@ -109,7 +109,6 @@ describe('review queue', () => {
     const q = createReviewQueue({
       db,
       notifier: { ...fakeNotifier(log), photosToOwner: async () => false },
-      tz: 'Europe/Moscow',
       uploadsDir,
       reviewer: async () => ({ score: 30, verdict: 'Плохо', issues: [] }),
       now: () => NOW,
@@ -143,6 +142,40 @@ describe('review queue', () => {
     q.enqueue(id)
     await q.idle()
     expect(calls).toBe(1)
+  })
+
+  it('does not overwrite a decision the owner made while the model was still answering', async () => {
+    let resolve!: (r: ReviewResult) => void
+    const q = queueWith(() => new Promise<ReviewResult>((r) => { resolve = r }))
+    const id = submission()
+    const instId = getSubmission(db, id)!.instance_id
+    q.enqueue(id)
+    await new Promise((r) => setTimeout(r, 5))
+    expect(q.isActive(id)).toBe(true)
+    // пока модель думает, планировщик исчерпал попытки и владелец успел отклонить сдачу
+    expect(markAiFailed(db, id, NOW.toISOString())).toBe(true)
+    expect(setOwnerDecision(db, id, 'owner_rejected', 'x', NOW.toISOString())).toBe(true)
+    setInstanceStatus(db, instId, 'pending')
+    const before = log.length
+    resolve({ score: 95, verdict: 'Всё чисто', issues: [] })
+    await q.idle()
+    expect(getSubmission(db, id)).toMatchObject({ decision: 'owner_rejected', owner_comment: 'x' })
+    expect(getInstance(db, instId)?.status).toBe('pending')
+    expect(log.slice(before).some((n) => n.text.includes('Принято'))).toBe(false)
+    expect(q.isActive(id)).toBe(false)
+  })
+
+  it('isActive covers both waiting and in-flight submissions', async () => {
+    const q = queueWith(async () => { await new Promise((r) => setTimeout(r, 20)); return { score: 90, verdict: 'ok', issues: [] } }, 1)
+    const first = submission()
+    const second = submission()
+    q.enqueue(first)
+    q.enqueue(second)
+    expect(q.isActive(first)).toBe(true)
+    expect(q.isActive(second)).toBe(true)
+    expect(q.isActive(second + 100)).toBe(false)
+    await q.idle()
+    expect(q.isActive(first)).toBe(false)
   })
 
   it('enqueue reports whether the id was accepted', async () => {

@@ -36,7 +36,7 @@ describe('decideByScore', () => {
 })
 
 describe('applyOwnerDecision', () => {
-  const deps = () => ({ db, notifier: fakeNotifier(log), tz: 'Europe/Moscow' })
+  const deps = () => ({ db, notifier: fakeNotifier(log) })
 
   it('accept closes the instance and tells the employee', async () => {
     const r = await applyOwnerDecision(deps(), subId, 'accept', null, new Date(NOW))

@@ -71,17 +71,23 @@ export function markAiStarted(db: Db, id: number): void {
   db.prepare('update task_submissions set ai_attempts = ai_attempts + 1 where id = ?').run(id)
 }
 
+/** Записывает результат ИИ. false, если решение по сдаче уже принято (владелец успел раньше). */
 export function saveAiResult(
   db: Db, id: number, r: { score: number; verdict: string; issues: string[] },
   decision: 'auto_accepted' | 'needs_review', nowIso: string,
-): void {
-  db.prepare(
-    `update task_submissions set ai_status = 'done', ai_score = ?, ai_verdict = ?, ai_issues = ?, decision = ?, decided_at = case when ? = 'auto_accepted' then ? else null end where id = ?`,
+): boolean {
+  const info = db.prepare(
+    `update task_submissions set ai_status = 'done', ai_score = ?, ai_verdict = ?, ai_issues = ?, decision = ?, decided_at = case when ? = 'auto_accepted' then ? else null end where id = ? and decision is null`,
   ).run(r.score, r.verdict, JSON.stringify(r.issues), decision, decision, nowIso, id)
+  return info.changes === 1
 }
 
-export function markAiFailed(db: Db, id: number, _nowIso: string): void {
-  db.prepare("update task_submissions set ai_status = 'failed', decision = 'needs_review' where id = ?").run(id)
+/** Помечает сдачу как непроверенную ИИ. false, если решение по сдаче уже принято. */
+export function markAiFailed(db: Db, id: number, _nowIso: string): boolean {
+  const info = db
+    .prepare("update task_submissions set ai_status = 'failed', decision = 'needs_review' where id = ? and decision is null")
+    .run(id)
+  return info.changes === 1
 }
 
 export function setOwnerDecision(db: Db, id: number, decision: 'owner_accepted' | 'owner_rejected', comment: string | null, nowIso: string): boolean {

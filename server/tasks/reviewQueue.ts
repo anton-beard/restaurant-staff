@@ -10,11 +10,16 @@ import type { Reviewer } from '../ai/photoReview.js'
 import { reviewKeyboard } from '../bot/keyboards.js'
 import { decideByScore, ownerReviewCaption } from './decide.js'
 
-export type ReviewQueue = { enqueue(submissionId: number): boolean; size(): number; idle(): Promise<void> }
+export type ReviewQueue = {
+  enqueue(submissionId: number): boolean
+  /** true, пока сдача ждёт в очереди или обрабатывается. */
+  isActive(submissionId: number): boolean
+  size(): number
+  idle(): Promise<void>
+}
 export type ReviewQueueDeps = {
   db: Db
   notifier: Notifier
-  tz: string
   uploadsDir: string
   reviewer: Reviewer
   concurrency?: number
@@ -66,7 +71,10 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
         criteria: template.photo_criteria ?? '',
       })
       const decision = decideByScore(result.score, template.auto_accept_threshold)
-      saveAiResult(db, submissionId, result, decision, now().toISOString())
+      if (!saveAiResult(db, submissionId, result, decision, now().toISOString())) {
+        console.warn('photo review: decision already made, ignoring AI result', submissionId)
+        return
+      }
       if (decision === 'auto_accepted') {
         setInstanceStatus(db, row.instance_id, 'accepted', { completed_at: now().toISOString() })
         await notifyEmployee(row.employee_id, `Принято, ${result.score} из 100. ${result.verdict}`.trim())
@@ -75,7 +83,10 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
       setInstanceStatus(db, row.instance_id, 'review')
     } catch (err) {
       console.error('photo review failed', submissionId, err)
-      markAiFailed(db, submissionId, now().toISOString())
+      if (!markAiFailed(db, submissionId, now().toISOString())) {
+        console.warn('photo review: decision already made, ignoring AI failure', submissionId)
+        return
+      }
       setInstanceStatus(db, row.instance_id, 'review')
     }
     await notifyEmployee(row.employee_id, 'Отправил владельцу на проверку.')
@@ -112,6 +123,7 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
       pump()
       return true
     },
+    isActive: (submissionId) => waiting.includes(submissionId) || active.has(submissionId),
     size: () => waiting.length + running,
     idle: () =>
       running === 0 && waiting.length === 0

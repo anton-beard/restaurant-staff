@@ -1,7 +1,7 @@
 import type { Bot, Context } from 'grammy'
 import { clearState, getState, setState } from '../db/botStates.js'
 import { getReviewRow } from '../db/taskSubmissions.js'
-import { applyOwnerDecision } from '../tasks/decide.js'
+import { applyOwnerDecision, type DecisionDeps } from '../tasks/decide.js'
 import { CB_RE } from './callbacks.js'
 import type { BotDeps } from './deps.js'
 import { BTN, cancelKeyboard, ownerMenu } from './keyboards.js'
@@ -16,7 +16,7 @@ export function registerReview(bot: Bot, deps: BotDeps): void {
     const s = getState<RejectState>(db, telegramId)
     return s?.kind === 'reject_comment' ? s : null
   }
-  const decisionDeps = { db, notifier: deps.notifier, tz: deps.tz }
+  const decisionDeps: DecisionDeps = { db, notifier: deps.notifier }
 
   async function dropButtons(ctx: Context): Promise<void> {
     try {
@@ -43,6 +43,9 @@ export function registerReview(bot: Bot, deps: BotDeps): void {
     const row = getReviewRow(db, id)
     if (!row || row.decision !== 'needs_review') return ctx.answerCallbackQuery({ text: 'Уже решено.' })
     setState(db, ctx.from.id, { kind: 'reject_comment', submission_id: id } satisfies RejectState)
+    // комментарий придёт отдельным сообщением, поэтому кнопки снимаем сразу: иначе по ним
+    // можно нажать ещё раз, пока владелец печатает. При отмене они так и остаются снятыми.
+    await dropButtons(ctx)
     await ctx.answerCallbackQuery()
     await ctx.reply('Напишите комментарий для сотрудника.', { reply_markup: cancelKeyboard() })
   })
@@ -57,7 +60,10 @@ export function registerReview(bot: Bot, deps: BotDeps): void {
     const state = rejectState(ctx.from.id)
     if (!state || !isOwner(ctx)) return next()
     const comment = ctx.message.text.trim()
-    if (!comment) return
+    if (!comment) {
+      await ctx.reply('Напишите комментарий для сотрудника.', { reply_markup: cancelKeyboard() })
+      return
+    }
     const r = await applyOwnerDecision(decisionDeps, state.submission_id, 'reject', comment, deps.now())
     clearState(db, ctx.from.id)
     await ctx.reply(r.ok ? 'Отклонено, сотруднику отправлено.' : 'Уже решено.', { reply_markup: ownerMenu() })
