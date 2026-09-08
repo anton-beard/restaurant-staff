@@ -117,6 +117,15 @@ export function setTemplateActive(db: Db, id: number, active: boolean, nextRunAt
   return info.changes === 0 ? null : getTaskTemplate(db, id)
 }
 
+export function deleteTaskTemplate(db: Db, id: number): 'deleted' | 'has_instances' | 'not_found' {
+  return db.transaction(() => {
+    const inUse = db.prepare('select 1 from task_instances where template_id = ? limit 1').get(id)
+    if (inUse) return 'has_instances' as const
+    const info = db.prepare('delete from task_templates where id = ?').run(id)
+    return info.changes === 0 ? ('not_found' as const) : ('deleted' as const)
+  })()
+}
+
 export function setNextRunAt(db: Db, id: number, iso: string | null): void {
   db.prepare('update task_templates set next_run_at = ? where id = ?').run(iso, id)
 }

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { openDb, type Db } from './connect.js'
 import { seedRestaurant } from '../test/fixtures.js'
 import {
-  createTaskTemplate, eligibleEmployees, getTaskTemplate, listDueTemplates, listTaskTemplates,
+  createTaskTemplate, deleteTaskTemplate, eligibleEmployees, getTaskTemplate, listDueTemplates, listTaskTemplates,
   setTemplateActive, updateTaskTemplate, type TaskTemplateInput,
 } from './taskTemplates.js'
 import {
@@ -70,6 +70,17 @@ describe('task templates', () => {
     createTaskTemplate(db, baseInput, '2026-09-07T10:01:00.000Z')
     createTaskTemplate(db, { ...baseInput, schedule: null }, null)
     expect(listDueTemplates(db, NOW).map((t) => t.id)).toEqual([1])
+  })
+
+  it('deletes a template without instances, refuses one with history', () => {
+    const t = createTaskTemplate(db, { ...baseInput, position_ids: [seed.positions.barista.id] }, null)
+    const withHistory = createTaskTemplate(db, { ...baseInput, position_ids: [seed.positions.barista.id] }, null)
+    createInstance(db, { template_id: withHistory.id, employee_id: seed.employees.ivan.id, slot_at: NOW, issued_at: NOW, due_at: NOW, status: 'pending' })
+    expect(deleteTaskTemplate(db, withHistory.id)).toBe('has_instances')
+    expect(deleteTaskTemplate(db, t.id)).toBe('deleted')
+    expect(getTaskTemplate(db, t.id)).toBeNull()
+    expect(db.prepare('select count(*) c from task_template_positions where template_id = ?').get(t.id)).toEqual({ c: 0 })
+    expect(deleteTaskTemplate(db, 999)).toBe('not_found')
   })
 })
 

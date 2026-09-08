@@ -5,10 +5,11 @@ import { describeSchedule } from '../lib/schedule'
 
 const templates = ref<TaskTemplate[]>([])
 const error = ref('')
+const showArchived = ref(false)
 
 async function load() {
   try {
-    templates.value = await api.tasks.templates.list(true)
+    templates.value = await api.tasks.templates.list(showArchived.value)
   } catch (err) {
     error.value = errorText(err)
   }
@@ -25,6 +26,17 @@ async function toggle(t: TaskTemplate) {
   }
 }
 
+async function remove(t: TaskTemplate) {
+  if (!window.confirm(`Удалить задание «${t.title}»?`)) return
+  error.value = ''
+  try {
+    await api.tasks.templates.remove(t.id)
+    await load()
+  } catch (err) {
+    error.value = errorText(err, { has_instances: 'По заданию уже есть история, отправьте его в архив.' })
+  }
+}
+
 const assignees = (t: TaskTemplate) =>
   t.assignee_mode === 'by_position' ? `Должности: ${t.position_ids.length}` : `Сотрудники: ${t.employee_ids.length}`
 
@@ -38,6 +50,11 @@ onMounted(load)
       <RouterLink to="/tasks/new" class="btn ml-auto">Новое задание</RouterLink>
     </div>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+
+    <label class="flex items-center gap-2 text-sm text-gray-600">
+      <input type="checkbox" v-model="showArchived" @change="load" />
+      Показывать архивные
+    </label>
 
     <table class="w-full bg-white rounded-xl shadow text-sm">
       <thead class="text-left text-gray-500">
@@ -58,10 +75,11 @@ onMounted(load)
           <td class="px-4 py-2">{{ assignees(t) }}</td>
           <td class="px-4 py-2">{{ t.distribution === 'each' ? 'Каждому' : 'Одно на всех' }}</td>
           <td class="px-4 py-2">{{ t.requires_photo ? 'Да' : 'Нет' }}</td>
-          <td class="px-4 py-2">{{ t.schedule ? (t.active ? 'Активно' : 'Остановлено') : 'Разовое' }}</td>
+          <td class="px-4 py-2">{{ !t.active ? 'В архиве' : t.schedule ? 'Активно' : 'Разовое' }}</td>
           <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
             <RouterLink :to="`/tasks/${t.id}/edit`" class="btn-secondary">Изменить</RouterLink>
-            <button v-if="t.schedule" class="btn-secondary" @click="toggle(t)">{{ t.active ? 'Остановить' : 'Возобновить' }}</button>
+            <button class="btn-secondary" @click="toggle(t)">{{ t.active ? 'В архив' : 'Вернуть' }}</button>
+            <button class="btn-secondary" @click="remove(t)">Удалить</button>
           </td>
         </tr>
         <tr v-if="templates.length === 0">

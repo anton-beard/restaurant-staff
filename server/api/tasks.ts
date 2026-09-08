@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import type { Db } from '../db/connect.js'
 import {
-  createTaskTemplate, getTaskTemplate, listTaskTemplates, setTemplateActive, updateTaskTemplate, type TaskTemplateInput,
+  createTaskTemplate, deleteTaskTemplate, getTaskTemplate, listTaskTemplates, setTemplateActive, updateTaskTemplate, type TaskTemplateInput,
 } from '../db/taskTemplates.js'
 import { getInstanceRow, listInstances } from '../db/taskInstances.js'
 import { listReviewQueue, listSubmissionsForInstance } from '../db/taskSubmissions.js'
@@ -102,6 +102,14 @@ export const taskRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     const t = getTaskTemplate(db, id)
     if (!t) return reply.code(404).send({ error: 'not_found' })
     return setTemplateActive(db, id, true, t.schedule ? nextRun(t.schedule, now(), tz).toISOString() : null)
+  })
+
+  app.delete('/api/tasks/templates/:id', async (req, reply) => {
+    const { id } = parse(idParams, req.params)
+    const result = deleteTaskTemplate(db, id)
+    if (result === 'has_instances') return reply.code(409).send({ error: 'has_instances' })
+    if (result === 'not_found') return reply.code(404).send({ error: 'not_found' })
+    return reply.code(204).send()
   })
 
   app.get('/api/tasks/instances', async (req) => listInstances(db, parse(instancesQuery, req.query)))

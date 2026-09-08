@@ -87,6 +87,21 @@ describe('task templates api', () => {
     const { app } = await setup()
     expect((await app.inject({ method: 'GET', url: '/api/tasks/templates' })).statusCode).toBe(401)
   })
+
+  it('deletes only templates without history', async () => {
+    const { app, seed, h } = await setup()
+    const empty = await app.inject({ method: 'POST', url: '/api/tasks/templates', headers: h, payload: weeklyBody(seed) })
+    const issued = await app.inject({ method: 'POST', url: '/api/tasks/templates', headers: h, payload: { ...weeklyBody(seed), schedule: null } })
+    const del = await app.inject({ method: 'DELETE', url: `/api/tasks/templates/${empty.json().template.id}`, headers: h })
+    expect(del.statusCode).toBe(204)
+    const refused = await app.inject({ method: 'DELETE', url: `/api/tasks/templates/${issued.json().template.id}`, headers: h })
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json()).toEqual({ error: 'has_instances' })
+    expect((await app.inject({ method: 'DELETE', url: '/api/tasks/templates/999', headers: h })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'DELETE', url: '/api/tasks/templates/1' })).statusCode).toBe(401)
+    const list = await app.inject({ method: 'GET', url: '/api/tasks/templates?includeInactive=1', headers: h })
+    expect(list.json().map((t: { id: number }) => t.id)).toEqual([issued.json().template.id])
+  })
 })
 
 describe('review queue api', () => {

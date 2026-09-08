@@ -124,6 +124,7 @@ export const api = {
       update: (id: number, input: TaskTemplateInput) => request<TaskTemplate>('PATCH', `/api/tasks/templates/${id}`, input),
       activate: (id: number) => request<TaskTemplate>('POST', `/api/tasks/templates/${id}/activate`),
       deactivate: (id: number) => request<TaskTemplate>('POST', `/api/tasks/templates/${id}/deactivate`),
+      remove: (id: number) => request<void>('DELETE', `/api/tasks/templates/${id}`),
     },
     instances: {
       list: (f: InstanceFilters) => request<InstanceRow[]>('GET', `/api/tasks/instances${qs(f)}`),
