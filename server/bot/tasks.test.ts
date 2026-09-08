@@ -168,4 +168,14 @@ describe('photo collection', () => {
     expect(!existsSync(dir) || readdirSync(dir).length === 0).toBe(true)
     expect(getInstance(db, instId)?.status).toBe('pending')
   })
+
+  it('menu buttons and /start during collection get the reminder, not the main menu', async () => {
+    await bot.handleUpdate(callbackUpdate(500, CB.photo(instId)))
+    for (const text of ['Мои задания', 'Обучение', '/start']) {
+      await bot.handleUpdate(textUpdate(500, text))
+      expect(lastText()).toBe('Сейчас идёт отправка фото. Пришлите фото, затем нажмите Готово, или нажмите Отмена.')
+      expect(JSON.stringify(calls.at(-1)!.payload.reply_markup)).toContain('Готово')
+    }
+    expect(getState(db, 500)).not.toBeNull()
+  })
 })
