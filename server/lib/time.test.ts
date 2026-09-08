@@ -21,6 +21,10 @@ describe('time', () => {
     expect(zonedToUtc({ y: 2026, m: 11, d: 1, hh: 3, mm: 0 }, 'America/New_York').toISOString()).toBe('2026-11-01T08:00:00.000Z')
     // the day before is still EDT, UTC-4
     expect(zonedToUtc({ y: 2026, m: 10, d: 31, hh: 3, mm: 0 }, 'America/New_York').toISOString()).toBe('2026-10-31T07:00:00.000Z')
+    // 2026-03-08 02:30 не существует в Нью-Йорке (переход на летнее время): сдвигаем вперёд к 03:30 EDT
+    expect(zonedToUtc({ y: 2026, m: 3, d: 8, hh: 2, mm: 30 }, 'America/New_York').toISOString()).toBe('2026-03-08T07:30:00.000Z')
+    // 01:30 того же дня существует и остаётся EST
+    expect(zonedToUtc({ y: 2026, m: 3, d: 8, hh: 1, mm: 30 }, 'America/New_York').toISOString()).toBe('2026-03-08T06:30:00.000Z')
   })
 
   it('addDays crosses month boundaries', () => {

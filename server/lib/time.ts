@@ -34,14 +34,22 @@ export function localParts(date: Date, tz: string): LocalParts {
   }
 }
 
+/**
+ * Момент UTC для локального времени в зоне tz.
+ * Если такого локального времени нет (весенний перевод часов), берём более поздний
+ * из двух кандидатов, то есть сдвигаем вперёд: 02:30 в «дыре» становится 03:30.
+ */
 export function zonedToUtc(p: { y: number; m: number; d: number; hh: number; mm: number }, tz: string): Date {
   const target = Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm)
   let guess = target
-  for (let i = 0; i < 3; i++) {
+  let previous = Number.NaN
+  for (let i = 0; i < 4; i++) {
     const lp = localParts(new Date(guess), tz)
     const offset = Date.UTC(lp.y, lp.m - 1, lp.d, lp.hh, lp.mm) - guess
     const next = target - offset
-    if (next === guess) break
+    if (next === guess) return new Date(guess)
+    if (next === previous) return new Date(Math.max(guess, next)) // осцилляция: локального времени не существует
+    previous = guess
     guess = next
   }
   return new Date(guess)
