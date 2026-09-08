@@ -40,3 +40,12 @@ export const photoCollectKeyboard = () => new Keyboard().text(BTN.photosDone).te
 export const cancelKeyboard = () => new Keyboard().text(BTN.cancel).resized()
 export const reviewKeyboard = (submissionId: number) =>
   new InlineKeyboard().text('Принять', CB.accept(submissionId)).text('Отклонить', CB.reject(submissionId))
+
+export const continueCourseKeyboard = (assignmentId: number) => new InlineKeyboard().text('Продолжить', CB.courseContinue(assignmentId))
+export const nextLessonKeyboard = (assignmentId: number, lesson: number) => new InlineKeyboard().text('Прочитал, дальше', CB.courseNext(assignmentId, lesson))
+export const startQuizKeyboard = (assignmentId: number, label = 'Начать') => new InlineKeyboard().text(label, CB.quizStart(assignmentId))
+export function answersKeyboard(attemptId: number, question: number, options: string[]): InlineKeyboard {
+  const kb = new InlineKeyboard()
+  options.forEach((o, i) => kb.text(o, CB.quizAnswer(attemptId, question, i)).row())
+  return kb
+}
