@@ -17,6 +17,7 @@ import { requireOwner } from './api/requireOwner.js'
 import { positionRoutes } from './api/positions.js'
 import { employeeRoutes } from './api/employees.js'
 import { taskRoutes } from './api/tasks.js'
+import { learningRoutes } from './api/learning.js'
 import { uploadRoutes } from './api/uploads.js'
 
 export type AppDeps = {
@@ -65,6 +66,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     scope.register(positionRoutes, { db })
     scope.register(employeeRoutes, { db })
     scope.register(taskRoutes, { db, notifier, tz: config.TZ })
+    scope.register(learningRoutes, { db, notifier, tz: config.TZ, uploadsDir: deps.uploadsDir })
     scope.register(uploadRoutes, { uploadsDir: deps.uploadsDir })
   })
 
