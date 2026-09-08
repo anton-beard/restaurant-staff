@@ -1,5 +1,5 @@
 import { Bot, type Api, type Context } from 'grammy'
-import type { Update, UserFromGetMe } from 'grammy/types'
+import type { ApiResponse, Update, UserFromGetMe } from 'grammy/types'
 
 export const botInfo: UserFromGetMe = {
   id: 1,
@@ -50,8 +50,8 @@ type Responder = (payload: Record<string, unknown>) => unknown
 
 let messageCounter = 100
 
-export function captureApi(
-  target: Api | Bot<Context>,
+export function captureApi<C extends Context>(
+  target: Api | Bot<C>,
   responders: Record<string, Responder> = {},
   calls: ApiCall[] = [],
 ): ApiCall[] {
@@ -60,12 +60,12 @@ export function captureApi(
     const p = payload as Record<string, unknown>
     calls.push({ method, payload: p })
     const custom = responders[method]
-    if (custom) return { ok: true, result: custom(p) }
+    if (custom) return { ok: true, result: custom(p) } as ApiResponse<any>
     if (method === 'sendMessage' || method === 'sendPhoto') {
-      return { ok: true, result: { message_id: ++messageCounter } }
+      return { ok: true, result: { message_id: ++messageCounter } } as ApiResponse<any>
     }
-    if (method === 'sendMediaGroup') return { ok: true, result: [] }
-    return { ok: true, result: true }
+    if (method === 'sendMediaGroup') return { ok: true, result: [] } as ApiResponse<any>
+    return { ok: true, result: true } as ApiResponse<any>
   })
   return calls
 }

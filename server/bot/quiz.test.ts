@@ -106,6 +106,19 @@ describe('taking a quiz', () => {
     expect(listAttempts(db, a.id)).toHaveLength(1)
   })
 
+  it('finishes a fully answered attempt on resume if the last completion was missed', async () => {
+    const a = standalone()
+    await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
+    const attempt = listAttempts(db, a.id)[0]!
+    // отвечены оба вопроса, но попытка осталась незавершённой (например, обработчик не успел её закрыть)
+    db.prepare('update quiz_attempts set current_question = 3, answers = ? where id = ?').run(JSON.stringify([0, 1]), attempt.id)
+    await bot.handleUpdate(textUpdate(500, 'Тесты'))
+    expect(lastText()).toBe('Сдано! 100 из 100.')
+    expect(texts().some((t) => /Тест изменился/.test(t.text))).toBe(false)
+    expect(getAttempt(db, attempt.id)).toMatchObject({ finished_at: NOW, score: 100, passed: true })
+    expect(getQuizAssignment(db, a.id)).toMatchObject({ status: 'passed', passed_at: NOW })
+  })
+
   it('closes the attempt and offers a restart when the quiz changed mid-attempt', async () => {
     const a = standalone()
     await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))

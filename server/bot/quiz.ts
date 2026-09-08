@@ -15,16 +15,47 @@ import { showHome } from './linking.js'
 import { discardCollection } from './tasks.js'
 import { employeeOf, onState, type BotContext } from './states.js'
 
+/** Оценивает завершённую попытку, сохраняет результат и сообщает сотруднику и владельцу. */
+async function finish(ctx: BotContext, deps: BotDeps, attempt: QuizAttempt, row: QuizAssignmentRow): Promise<void> {
+  const { db } = deps
+  const questions = listQuestions(db, row.quiz_id)
+  const quiz = getQuiz(db, row.quiz_id)!
+  const { correct, total, score } = scoreAnswers(attempt.answers, questions)
+  const passed = isPassed(score, quiz.pass_score)
+  const nowIso = deps.now().toISOString()
+  finishAttempt(db, attempt.id, score, passed, nowIso)
+  clearState(db, ctx.from!.id)
+  if (!passed) {
+    await deps.notifier.toOwner(`${row.employee_name} не сдал(а) тест «${row.title}»: ${score} из 100.`)
+    await ctx.reply(`Не сдано: правильных ${correct} из ${total}, нужно ${quiz.pass_score}%.`, { reply_markup: startQuizKeyboard(row.id, 'Пересдать') })
+    return
+  }
+  markQuizPassed(db, row.id, nowIso)
+  if (row.course_assignment_id !== null) {
+    completeCourseAssignment(db, row.course_assignment_id, nowIso)
+    const ca = getCourseAssignment(db, row.course_assignment_id)
+    const course = ca ? getCourse(db, ca.course_id) : null
+    await deps.notifier.toOwner(`${row.employee_name} прошёл(а) курс «${course?.title ?? row.title}» (${score} из 100).`)
+  }
+  await ctx.reply(`Сдано! ${score} из 100.`, { reply_markup: employeeMenu() })
+}
+
 /**
  * Отправляет текущий вопрос попытки, при необходимости с предваряющим сообщением.
- * Если вопроса больше нет (тест изменили на ходу), закрывает попытку без оценки, снимает состояние
- * и предлагает начать заново — возвращает false, делать после этого нечего.
+ * Если все вопросы уже отвечены (например, предыдущий ответ не довёл попытку до конца), завершает
+ * её обычным образом. Если вопроса больше нет и отвечать нечего (тест изменили на ходу), закрывает
+ * попытку без оценки, снимает состояние и предлагает начать заново — возвращает false, делать после
+ * этого нечего.
  */
 export async function askQuestion(ctx: BotContext, deps: BotDeps, attempt: QuizAttempt, notice?: string): Promise<boolean> {
   const row = getQuizAssignmentRow(deps.db, attempt.assignment_id)!
   const questions = listQuestions(deps.db, row.quiz_id)
   const q = questions.find((x) => x.position === attempt.current_question)
   if (!q) {
+    if (questions.length > 0 && attempt.current_question > questions.length) {
+      await finish(ctx, deps, attempt, row)
+      return false
+    }
     abandonAttempt(deps.db, attempt.id, deps.now().toISOString())
     clearState(deps.db, ctx.from!.id)
     const canRestart = row.status === 'pending' || row.status === 'overdue'
@@ -56,29 +87,6 @@ export function registerQuizStates(bot: Bot<BotContext>, deps: BotDeps): void {
 
 export function registerQuiz(bot: Bot<BotContext>, deps: BotDeps): void {
   const { db } = deps
-
-  async function finish(ctx: BotContext, attempt: QuizAttempt, row: QuizAssignmentRow): Promise<void> {
-    const questions = listQuestions(db, row.quiz_id)
-    const quiz = getQuiz(db, row.quiz_id)!
-    const { correct, total, score } = scoreAnswers(attempt.answers, questions)
-    const passed = isPassed(score, quiz.pass_score)
-    const nowIso = deps.now().toISOString()
-    finishAttempt(db, attempt.id, score, passed, nowIso)
-    clearState(db, ctx.from!.id)
-    if (!passed) {
-      await deps.notifier.toOwner(`${row.employee_name} не сдал(а) тест «${row.title}»: ${score} из 100.`)
-      await ctx.reply(`Не сдано: правильных ${correct} из ${total}, нужно ${quiz.pass_score}%.`, { reply_markup: startQuizKeyboard(row.id, 'Пересдать') })
-      return
-    }
-    markQuizPassed(db, row.id, nowIso)
-    if (row.course_assignment_id !== null) {
-      completeCourseAssignment(db, row.course_assignment_id, nowIso)
-      const ca = getCourseAssignment(db, row.course_assignment_id)
-      const course = ca ? getCourse(db, ca.course_id) : null
-      await deps.notifier.toOwner(`${row.employee_name} прошёл(а) курс «${course?.title ?? row.title}» (${score} из 100).`)
-    }
-    await ctx.reply(`Сдано! ${score} из 100.`, { reply_markup: employeeMenu() })
-  }
 
   bot.hears(BTN.quizzes, async (ctx) => {
     const emp = employeeOf(ctx)
@@ -121,6 +129,6 @@ export function registerQuiz(bot: Bot<BotContext>, deps: BotDeps): void {
       await askQuestion(ctx, deps, fresh)
       return
     }
-    await finish(ctx, fresh, row)
+    await finish(ctx, deps, fresh, row)
   })
 }
