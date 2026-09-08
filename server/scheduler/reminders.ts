@@ -14,17 +14,21 @@ export function reminderLeadMs(durationMs: number): number {
 export async function sendReminders(deps: SchedulerDeps, now: Date): Promise<number> {
   let sent = 0
   for (const inst of listReminderCandidates(deps.db, now.toISOString())) {
-    const due = new Date(inst.due_at)
-    const duration = due.getTime() - new Date(inst.issued_at).getTime()
-    if (due.getTime() - now.getTime() > reminderLeadMs(duration)) continue
-    markReminderSent(deps.db, inst.id, now.toISOString())
-    const row = getInstanceRow(deps.db, inst.id)
-    const employee = inst.employee_id ? getEmployee(deps.db, inst.employee_id) : null
-    if (!row || !employee?.telegram_id) continue
-    const id = await deps.notifier.toEmployee(employee.telegram_id, `Напоминание: «${row.title}»\n${taskDueText(due, deps.tz, now)}`, {
-      keyboard: openTaskKeyboard(inst.id),
-    })
-    if (id !== null) sent++
+    try {
+      const due = new Date(inst.due_at)
+      const duration = due.getTime() - new Date(inst.issued_at).getTime()
+      if (due.getTime() - now.getTime() > reminderLeadMs(duration)) continue
+      markReminderSent(deps.db, inst.id, now.toISOString())
+      const row = getInstanceRow(deps.db, inst.id)
+      const employee = inst.employee_id ? getEmployee(deps.db, inst.employee_id) : null
+      if (!row || !employee?.telegram_id) continue
+      const id = await deps.notifier.toEmployee(employee.telegram_id, `Напоминание: «${row.title}»\n${taskDueText(due, deps.tz, now)}`, {
+        keyboard: openTaskKeyboard(inst.id),
+      })
+      if (id !== null) sent++
+    } catch (err) {
+      console.error('scheduler: sendReminders failed for task', inst.id, err)
+    }
   }
   return sent
 }

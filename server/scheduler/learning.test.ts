@@ -79,4 +79,16 @@ describe('learningOverdue', () => {
     expect(log.filter((n) => n.to === 500 || n.to === 501)).toHaveLength(2)
     expect(await learningOverdue(deps, T('2026-09-07T10:01:00.000Z'))).toBe(0)
   })
+
+  it('continues with the remaining items when one notification throws', async () => {
+    const { course } = seedCourse(db, [seed.positions.barista.id])
+    const a1 = createCourseAssignment(db, { course_id: course.id, employee_id: seed.employees.ivan.id, assigned_at: '2026-09-01T10:00:00.000Z', due_at: '2026-09-06T10:00:00.000Z' })!
+    const a2 = createCourseAssignment(db, { course_id: course.id, employee_id: seed.employees.anna.id, assigned_at: '2026-09-01T10:00:00.000Z', due_at: '2026-09-06T11:00:00.000Z' })!
+    let first = true
+    const throwing = { ...fakeNotifier(log), toEmployee: async (id: number, text: string) => { if (first) { first = false; throw new Error('telegram down') } log.push({ to: id, text }); return 1 } }
+    expect(await learningOverdue({ ...deps, notifier: throwing }, T('2026-09-07T10:00:00.000Z'))).toBe(2)
+    expect(getCourseAssignment(db, a1.id)?.status).toBe('overdue')
+    expect(getCourseAssignment(db, a2.id)?.status).toBe('overdue')
+    expect(log.some((n) => n.to === 501)).toBe(true)
+  })
 })

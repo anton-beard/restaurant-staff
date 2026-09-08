@@ -54,30 +54,38 @@ export function courseReminderLeadMs(durationMs: number): number {
 export async function learningReminders(deps: SchedulerDeps, now: Date): Promise<number> {
   let sent = 0
   for (const a of listCourseReminderCandidates(deps.db, now.toISOString())) {
-    const due = new Date(a.due_at)
-    const lead = courseReminderLeadMs(due.getTime() - new Date(a.assigned_at).getTime())
-    if (due.getTime() - now.getTime() > lead) continue
-    markCourseReminderSent(deps.db, a.id, now.toISOString())
-    const row = getCourseAssignmentRow(deps.db, a.id)
-    const e = getEmployee(deps.db, a.employee_id)
-    if (!row || !e?.telegram_id) continue
-    const id = await deps.notifier.toEmployee(e.telegram_id, `Напоминание: курс «${row.title}» нужно пройти до ${formatLocal(due, deps.tz, now)}`, {
-      keyboard: continueCourseKeyboard(a.id),
-    })
-    if (id !== null) sent++
+    try {
+      const due = new Date(a.due_at)
+      const lead = courseReminderLeadMs(due.getTime() - new Date(a.assigned_at).getTime())
+      if (due.getTime() - now.getTime() > lead) continue
+      markCourseReminderSent(deps.db, a.id, now.toISOString())
+      const row = getCourseAssignmentRow(deps.db, a.id)
+      const e = getEmployee(deps.db, a.employee_id)
+      if (!row || !e?.telegram_id) continue
+      const id = await deps.notifier.toEmployee(e.telegram_id, `Напоминание: курс «${row.title}» нужно пройти до ${formatLocal(due, deps.tz, now)}`, {
+        keyboard: continueCourseKeyboard(a.id),
+      })
+      if (id !== null) sent++
+    } catch (err) {
+      console.error('scheduler: learningReminders failed for course', a.id, err)
+    }
   }
   for (const a of listQuizReminderCandidates(deps.db, now.toISOString())) {
-    const due = new Date(a.due_at)
-    const lead = Math.floor((due.getTime() - new Date(a.assigned_at).getTime()) / 2)
-    if (due.getTime() - now.getTime() > lead) continue
-    markQuizReminderSent(deps.db, a.id, now.toISOString())
-    const row = getQuizAssignmentRow(deps.db, a.id)
-    const e = getEmployee(deps.db, a.employee_id)
-    if (!row || !e?.telegram_id) continue
-    const id = await deps.notifier.toEmployee(e.telegram_id, `Напоминание: тест «${row.title}» нужно пройти до ${formatLocal(due, deps.tz, now)}`, {
-      keyboard: startQuizKeyboard(a.id, row.open_attempt_id ? 'Продолжить' : 'Начать'),
-    })
-    if (id !== null) sent++
+    try {
+      const due = new Date(a.due_at)
+      const lead = Math.floor((due.getTime() - new Date(a.assigned_at).getTime()) / 2)
+      if (due.getTime() - now.getTime() > lead) continue
+      markQuizReminderSent(deps.db, a.id, now.toISOString())
+      const row = getQuizAssignmentRow(deps.db, a.id)
+      const e = getEmployee(deps.db, a.employee_id)
+      if (!row || !e?.telegram_id) continue
+      const id = await deps.notifier.toEmployee(e.telegram_id, `Напоминание: тест «${row.title}» нужно пройти до ${formatLocal(due, deps.tz, now)}`, {
+        keyboard: startQuizKeyboard(a.id, row.open_attempt_id ? 'Продолжить' : 'Начать'),
+      })
+      if (id !== null) sent++
+    } catch (err) {
+      console.error('scheduler: learningReminders failed for quiz', a.id, err)
+    }
   }
   return sent
 }
@@ -85,22 +93,30 @@ export async function learningReminders(deps: SchedulerDeps, now: Date): Promise
 export async function learningOverdue(deps: SchedulerDeps, now: Date): Promise<number> {
   let count = 0
   for (const a of listCourseOverdueCandidates(deps.db, now.toISOString())) {
-    setCourseAssignmentStatus(deps.db, a.id, 'overdue')
-    count++
-    const row = getCourseAssignmentRow(deps.db, a.id)
-    const e = getEmployee(deps.db, a.employee_id)
-    if (!row) continue
-    if (e?.telegram_id) await deps.notifier.toEmployee(e.telegram_id, `Курс «${row.title}» просрочен. Пройдите его как можно скорее.`, { keyboard: continueCourseKeyboard(a.id) })
-    await deps.notifier.toOwner(`${row.employee_name} просрочил(а) курс «${row.title}».`)
+    try {
+      setCourseAssignmentStatus(deps.db, a.id, 'overdue')
+      count++
+      const row = getCourseAssignmentRow(deps.db, a.id)
+      const e = getEmployee(deps.db, a.employee_id)
+      if (!row) continue
+      if (e?.telegram_id) await deps.notifier.toEmployee(e.telegram_id, `Курс «${row.title}» просрочен. Пройдите его как можно скорее.`, { keyboard: continueCourseKeyboard(a.id) })
+      await deps.notifier.toOwner(`${row.employee_name} просрочил(а) курс «${row.title}».`)
+    } catch (err) {
+      console.error('scheduler: learningOverdue failed for course', a.id, err)
+    }
   }
   for (const a of listQuizOverdueCandidates(deps.db, now.toISOString())) {
-    setQuizAssignmentStatus(deps.db, a.id, 'overdue')
-    count++
-    const row = getQuizAssignmentRow(deps.db, a.id)
-    const e = getEmployee(deps.db, a.employee_id)
-    if (!row) continue
-    if (e?.telegram_id) await deps.notifier.toEmployee(e.telegram_id, `Тест «${row.title}» просрочен. Пройдите его как можно скорее.`, { keyboard: startQuizKeyboard(a.id) })
-    await deps.notifier.toOwner(`${row.employee_name} просрочил(а) тест «${row.title}».`)
+    try {
+      setQuizAssignmentStatus(deps.db, a.id, 'overdue')
+      count++
+      const row = getQuizAssignmentRow(deps.db, a.id)
+      const e = getEmployee(deps.db, a.employee_id)
+      if (!row) continue
+      if (e?.telegram_id) await deps.notifier.toEmployee(e.telegram_id, `Тест «${row.title}» просрочен. Пройдите его как можно скорее.`, { keyboard: startQuizKeyboard(a.id) })
+      await deps.notifier.toOwner(`${row.employee_name} просрочил(а) тест «${row.title}».`)
+    } catch (err) {
+      console.error('scheduler: learningOverdue failed for quiz', a.id, err)
+    }
   }
   return count
 }
