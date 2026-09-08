@@ -35,12 +35,14 @@ export function localParts(date: Date, tz: string): LocalParts {
 }
 
 export function zonedToUtc(p: { y: number; m: number; d: number; hh: number; mm: number }, tz: string): Date {
-  let guess = Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm)
-  for (let i = 0; i < 2; i++) {
+  const target = Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm)
+  let guess = target
+  for (let i = 0; i < 3; i++) {
     const lp = localParts(new Date(guess), tz)
-    if (lp.y === p.y && lp.m === p.m && lp.d === p.d && lp.hh === p.hh && lp.mm === p.mm) break
-    const asUtc = Date.UTC(lp.y, lp.m - 1, lp.d, lp.hh, lp.mm)
-    guess -= asUtc - guess
+    const offset = Date.UTC(lp.y, lp.m - 1, lp.d, lp.hh, lp.mm) - guess
+    const next = target - offset
+    if (next === guess) break
+    guess = next
   }
   return new Date(guess)
 }
