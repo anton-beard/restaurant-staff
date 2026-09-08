@@ -133,4 +133,15 @@ describe('review queue', () => {
     expect(getSubmission(db, id)).toMatchObject({ ai_status: 'failed', decision: 'needs_review' })
     expect(log.some((n) => n.to === 'owner' && n.text.includes('ИИ недоступен'))).toBe(true)
   })
+
+  it('ignores enqueue for a submission that is being processed', async () => {
+    let calls = 0
+    const q = queueWith(async () => { calls++; await new Promise((r) => setTimeout(r, 20)); return { score: 90, verdict: 'ok', issues: [] } })
+    const id = submission()
+    q.enqueue(id)
+    await new Promise((r) => setTimeout(r, 5))
+    q.enqueue(id)
+    await q.idle()
+    expect(calls).toBe(1)
+  })
 })

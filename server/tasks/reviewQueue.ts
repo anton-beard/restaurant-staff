@@ -26,6 +26,7 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
   const concurrency = deps.concurrency ?? 2
   const now = deps.now ?? (() => new Date())
   const waiting: number[] = []
+  const active = new Set<number>()
   let running = 0
   let idleWaiters: (() => void)[] = []
 
@@ -82,9 +83,11 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
     while (running < concurrency && waiting.length > 0) {
       const id = waiting.shift()!
       running++
+      active.add(id)
       process(id)
         .catch((err) => console.error('review job crashed', id, err))
         .finally(() => {
+          active.delete(id)
           running--
           if (running === 0 && waiting.length === 0) {
             const w = idleWaiters
@@ -99,7 +102,7 @@ export function createReviewQueue(deps: ReviewQueueDeps): ReviewQueue {
 
   return {
     enqueue(submissionId) {
-      if (waiting.includes(submissionId)) return
+      if (waiting.includes(submissionId) || active.has(submissionId)) return
       waiting.push(submissionId)
       pump()
     },
