@@ -5,6 +5,8 @@ import { api, errorText, type Course, type Position } from '../api'
 const courses = ref<Course[]>([])
 const positions = ref<Position[]>([])
 const error = ref('')
+const info = ref('')
+const publishing = ref<Course | null>(null)
 const STATUS: Record<Course['status'], string> = { draft: 'Черновик', published: 'Опубликован', archived: 'В архиве' }
 
 async function load() {
@@ -16,12 +18,19 @@ async function load() {
 }
 const positionNames = (ids: number[]) => ids.map((id) => positions.value.find((p) => p.id === id)?.name ?? '?').join(', ')
 
-async function publish(c: Course) {
-  const assignExisting = window.confirm(`Назначить курс «${c.title}» всем текущим сотрудникам выбранных должностей?\nОК — всем текущим, Отмена — только новым.`)
+function publish(c: Course) {
+  info.value = ''
+  error.value = ''
+  publishing.value = c
+}
+
+async function doPublish(assignExisting: boolean) {
+  if (!publishing.value) return
   error.value = ''
   try {
-    const r = await api.learning.courses.publish(c.id, assignExisting)
-    window.alert(`Опубликовано. Назначено сотрудникам: ${r.assigned}`)
+    const r = await api.learning.courses.publish(publishing.value.id, assignExisting)
+    info.value = `Опубликовано. Назначено сотрудникам: ${r.assigned}`
+    publishing.value = null
     await load()
   } catch (err) {
     error.value = errorText(err)
@@ -49,6 +58,15 @@ onMounted(load)
       <RouterLink to="/learning/courses/new" class="btn ml-auto">Новый курс</RouterLink>
     </div>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+    <p v-if="info" class="text-sm text-green-700">{{ info }}</p>
+    <div v-if="publishing" class="bg-white rounded-xl shadow p-4 space-y-3 text-sm">
+      <p>Публикация курса «{{ publishing.title }}». Кому назначить?</p>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn" @click="doPublish(true)">Всем текущим сотрудникам должностей</button>
+        <button class="btn-secondary" @click="doPublish(false)">Только новым сотрудникам</button>
+        <button class="btn-secondary" @click="publishing = null">Отмена</button>
+      </div>
+    </div>
     <table class="w-full bg-white rounded-xl shadow text-sm">
       <thead class="text-left text-gray-500">
         <tr><th class="px-4 py-2">Название</th><th class="px-4 py-2">Должности</th><th class="px-4 py-2">Уроков</th><th class="px-4 py-2">Срок, дней</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>

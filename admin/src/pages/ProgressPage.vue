@@ -16,13 +16,13 @@ const COURSE_STATUS: Record<string, string> = { in_progress: 'В процесс�
 const QUIZ_STATUS: Record<string, string> = { pending: 'Не сдан', passed: 'Сдан', overdue: 'Просрочен' }
 
 async function load() {
-  error.value = ''
   try {
     if (tab.value === 'courses') {
       courseRows.value = await api.learning.assignments.courses({ employee_id: filters.employee_id || undefined, course_id: filters.course_id || undefined, status: filters.status || undefined })
     } else {
       quizRows.value = await api.learning.assignments.quizzes({ employee_id: filters.employee_id || undefined, quiz_id: filters.quiz_id || undefined, status: filters.status || undefined })
     }
+    error.value = ''
   } catch (err) {
     error.value = errorText(err)
   }
@@ -40,10 +40,12 @@ onMounted(async () => {
     ;[courses.value, quizzes.value, employees.value] = await Promise.all([api.learning.courses.list(true), api.learning.quizzes.list(true), api.employees.list(true)])
   } catch (err) {
     error.value = errorText(err)
+    return
   }
   await load()
 })
-watch([tab, filters], () => { filters.status = ''; void load() }, { deep: true })
+watch(tab, () => { filters.status = ''; void load() })
+watch(filters, load, { deep: true })
 </script>
 
 <template>
@@ -56,6 +58,15 @@ watch([tab, filters], () => { filters.status = ''; void load() }, { deep: true }
       <select v-model="filters.employee_id" class="input max-w-56"><option value="">Все сотрудники</option><option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option></select>
       <select v-if="tab === 'courses'" v-model="filters.course_id" class="input max-w-64"><option value="">Все курсы</option><option v-for="c in courses" :key="c.id" :value="c.id">{{ c.title }}</option></select>
       <select v-else v-model="filters.quiz_id" class="input max-w-64"><option value="">Все тесты</option><option v-for="q in quizzes" :key="q.id" :value="q.id">{{ q.title }}</option></select>
+      <select v-model="filters.status" class="input max-w-56">
+        <option value="">Все статусы</option>
+        <template v-if="tab === 'courses'">
+          <option v-for="(label, key) in COURSE_STATUS" :key="key" :value="key">{{ label }}</option>
+        </template>
+        <template v-else>
+          <option v-for="(label, key) in QUIZ_STATUS" :key="key" :value="key">{{ label }}</option>
+        </template>
+      </select>
     </div>
 
     <table v-if="tab === 'courses'" class="w-full bg-white rounded-xl shadow text-sm">

@@ -10,8 +10,10 @@ const editing = computed(() => props.id !== undefined)
 const positions = ref<Position[]>([])
 const error = ref('')
 const busy = ref(false)
-const form = reactive<CourseBody>({ title: '', description: '', due_days: 7, pass_score: 80, position_ids: [], lessons: [], questions: [] })
+type FormLesson = Lesson & { key: number }
+const form = reactive<Omit<CourseBody, 'lessons'> & { lessons: FormLesson[] }>({ title: '', description: '', due_days: 7, pass_score: 80, position_ids: [], lessons: [], questions: [] })
 const videoDraft = ref<Record<number, string>>({})
+let nextKey = 0
 
 async function load() {
   positions.value = await api.positions.list()
@@ -19,17 +21,17 @@ async function load() {
   const d = await api.learning.courses.get(Number(props.id))
   Object.assign(form, {
     title: d.course.title, description: d.course.description, due_days: d.course.due_days, pass_score: d.course.pass_score,
-    position_ids: d.course.position_ids, lessons: d.lessons.map((l) => ({ title: l.title, body: l.body, media: [...l.media] })), questions: d.questions.map((q) => ({ text: q.text, options: [...q.options], correct_index: q.correct_index })),
+    position_ids: d.course.position_ids, lessons: d.lessons.map((l) => ({ title: l.title, body: l.body, media: [...l.media], key: nextKey++ })), questions: d.questions.map((q) => ({ text: q.text, options: [...q.options], correct_index: q.correct_index })),
   })
 }
 
-const addLesson = () => form.lessons.push({ title: '', body: '', media: [] })
+const addLesson = () => form.lessons.push({ title: '', body: '', media: [], key: nextKey++ })
 const removeLesson = (i: number) => form.lessons.splice(i, 1)
 function move(i: number, d: -1 | 1) {
   const j = i + d
   if (j < 0 || j >= form.lessons.length) return
   const [l] = form.lessons.splice(i, 1)
-  form.lessons.splice(j, 0, l as Lesson)
+  form.lessons.splice(j, 0, l as FormLesson)
 }
 async function addImage(i: number, ev: Event) {
   const input = ev.target as HTMLInputElement
@@ -45,11 +47,11 @@ async function addImage(i: number, ev: Event) {
     input.value = ''
   }
 }
-function addVideo(i: number) {
-  const url = (videoDraft.value[i] ?? '').trim()
+function addVideo(l: FormLesson) {
+  const url = (videoDraft.value[l.key] ?? '').trim()
   if (!url) return
-  form.lessons[i]!.media.push({ kind: 'video', url })
-  videoDraft.value[i] = ''
+  l.media.push({ kind: 'video', url })
+  videoDraft.value[l.key] = ''
 }
 const removeMedia = (i: number, j: number) => form.lessons[i]!.media.splice(j, 1)
 const setQuestions = (q: Question[]) => (form.questions = q)
@@ -58,7 +60,7 @@ async function save() {
   busy.value = true
   error.value = ''
   try {
-    const body: CourseBody = { ...form, due_days: Number(form.due_days), pass_score: Number(form.pass_score) }
+    const body: CourseBody = { ...form, due_days: Number(form.due_days), pass_score: Number(form.pass_score), lessons: form.lessons.map(({ key, ...rest }) => rest) }
     if (editing.value) await api.learning.courses.update(Number(props.id), body)
     else await api.learning.courses.create(body)
     await router.push('/learning/courses')
@@ -90,7 +92,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
 
     <section class="bg-white rounded-xl shadow p-4 space-y-4">
       <div class="text-sm font-medium">Уроки</div>
-      <div v-for="(l, i) in form.lessons" :key="i" class="border rounded-lg p-3 space-y-2">
+      <div v-for="(l, i) in form.lessons" :key="l.key" class="border rounded-lg p-3 space-y-2">
         <div class="flex gap-2 items-center">
           <span class="text-sm text-gray-500 w-6">{{ i + 1 }}.</span>
           <input v-model="l.title" class="input" placeholder="Заголовок урока" required />
@@ -110,8 +112,8 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
         </div>
         <div class="flex flex-wrap gap-2 items-center text-sm">
           <label class="btn-secondary cursor-pointer">Добавить картинку<input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="addImage(i, $event)" /></label>
-          <input v-model="videoDraft[i]" class="input max-w-72" placeholder="Ссылка на видео (YouTube и т.п.)" />
-          <button type="button" class="btn-secondary" @click="addVideo(i)">Добавить видео</button>
+          <input v-model="videoDraft[l.key]" class="input max-w-72" placeholder="Ссылка на видео (YouTube и т.п.)" />
+          <button type="button" class="btn-secondary" @click="addVideo(l)">Добавить видео</button>
         </div>
       </div>
       <button type="button" class="btn-secondary" @click="addLesson">+ урок</button>
