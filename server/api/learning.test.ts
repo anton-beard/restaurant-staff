@@ -53,6 +53,30 @@ describe('courses api', () => {
     expect((await app.inject({ method: 'GET', url: '/api/learning/courses?includeArchived=1', headers: h })).json()).toHaveLength(1)
   })
 
+  it('refuses to break a published course and keeps the stored parts', async () => {
+    const { app, seed, h } = await setup()
+    const body = courseBody([seed.positions.barista.id])
+    const id = (await app.inject({ method: 'POST', url: '/api/learning/courses', headers: h, payload: body })).json().course.id
+    await app.inject({ method: 'POST', url: `/api/learning/courses/${id}/publish`, headers: h, payload: { assign_existing: false } })
+
+    const noQuestions = await app.inject({ method: 'PATCH', url: `/api/learning/courses/${id}`, headers: h, payload: { ...body, questions: [] } })
+    expect(noQuestions.statusCode).toBe(409)
+    expect(noQuestions.json()).toMatchObject({ error: 'incomplete' })
+    expect(noQuestions.json().issues.join(' ')).toMatch(/вопрос/i)
+    const noPositions = await app.inject({ method: 'PATCH', url: `/api/learning/courses/${id}`, headers: h, payload: { ...body, position_ids: [], lessons: [] } })
+    expect(noPositions.statusCode).toBe(409)
+    expect(noPositions.json().issues).toHaveLength(2)
+
+    const read = await app.inject({ method: 'GET', url: `/api/learning/courses/${id}`, headers: h })
+    expect(read.json().questions).toHaveLength(1)
+    expect(read.json().lessons).toHaveLength(2)
+    expect(read.json().course.position_ids).toEqual([seed.positions.barista.id])
+
+    const ok = await app.inject({ method: 'PATCH', url: `/api/learning/courses/${id}`, headers: h, payload: { ...body, title: 'Эспрессо 2' } })
+    expect(ok.statusCode).toBe(200)
+    expect(ok.json().course.title).toBe('Эспрессо 2')
+  })
+
   it('validates the body', async () => {
     const { app, seed, h } = await setup()
     const bad = { ...courseBody([seed.positions.barista.id]), questions: [{ text: 'x', options: ['a'], correct_index: 0 }] }
@@ -95,18 +119,41 @@ describe('quizzes api', () => {
     const interval = { ...body, schedule: { kind: 'interval', days: [1], from: '10:00', to: '12:00', every_minutes: 60 } }
     expect((await app.inject({ method: 'POST', url: '/api/learning/quizzes', headers: h, payload: interval })).statusCode).toBe(400)
   })
+
+  it('refuses to break a published quiz and keeps the stored questions', async () => {
+    const { app, seed, h } = await setup()
+    const body = {
+      title: 'Меню недели', pass_score: 80, position_ids: [seed.positions.barista.id],
+      schedule: { kind: 'weekly', days: [1], times: ['10:00'] }, deadline_minutes: 480,
+      questions: [{ text: 'Цена капучино?', options: ['250', '300'], correct_index: 1 }],
+    }
+    const id = (await app.inject({ method: 'POST', url: '/api/learning/quizzes', headers: h, payload: body })).json().quiz.id
+    await app.inject({ method: 'POST', url: `/api/learning/quizzes/${id}/publish`, headers: h })
+
+    const broken = await app.inject({ method: 'PATCH', url: `/api/learning/quizzes/${id}`, headers: h, payload: { ...body, position_ids: [], questions: [] } })
+    expect(broken.statusCode).toBe(409)
+    expect(broken.json()).toMatchObject({ error: 'incomplete' })
+    expect(broken.json().issues).toHaveLength(2)
+    const read = await app.inject({ method: 'GET', url: `/api/learning/quizzes/${id}`, headers: h })
+    expect(read.json().questions).toHaveLength(1)
+    expect(read.json().quiz.position_ids).toEqual([seed.positions.barista.id])
+
+    const ok = await app.inject({ method: 'PATCH', url: `/api/learning/quizzes/${id}`, headers: h, payload: { ...body, title: 'Меню недели 2' } })
+    expect(ok.statusCode).toBe(200)
+    expect(ok.json().quiz.title).toBe('Меню недели 2')
+  })
 })
 
 describe('upload', () => {
   it('stores an image and rejects other types', async () => {
     const { app, h, uploadsDir } = await setup()
-    const ok = await app.inject({ method: 'POST', url: '/api/learning/upload', headers: h, payload: { filename: 'a.jpg', mime: 'image/jpeg', data: Buffer.from('jpegdata').toString('base64') } })
+    const ok = await app.inject({ method: 'POST', url: '/api/learning/upload', headers: h, payload: { mime: 'image/jpeg', data: Buffer.from('jpegdata').toString('base64') } })
     expect(ok.statusCode).toBe(201)
     expect(ok.json().path).toMatch(/^lessons\/\d{4}-\d{2}\/[a-f0-9]+\.jpg$/)
     expect(existsSync(join(uploadsDir, ok.json().path))).toBe(true)
     const served = await app.inject({ method: 'GET', url: `/api/uploads/${ok.json().path}`, headers: h })
     expect(served.body).toBe('jpegdata')
-    const bad = await app.inject({ method: 'POST', url: '/api/learning/upload', headers: h, payload: { filename: 'a.gif', mime: 'image/gif', data: 'AAAA' } })
+    const bad = await app.inject({ method: 'POST', url: '/api/learning/upload', headers: h, payload: { mime: 'image/gif', data: 'AAAA' } })
     expect(bad.statusCode).toBe(400)
   })
 })

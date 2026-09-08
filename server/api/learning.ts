@@ -47,7 +47,6 @@ const quizBody = z.object({
   questions: z.array(question).default([]),
 })
 const uploadBody = z.object({
-  filename: z.string().min(1).max(200),
   mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   data: z.string().min(1),
 })
@@ -85,12 +84,22 @@ export const learningRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     replaceQuestions(db, quiz.id, body.questions)
   }
 
-  function courseIssues(course: Course): string[] {
+  function courseIssuesOf(positions: number, lessons: number, questions: number): string[] {
     const issues: string[] = []
-    if (course.position_ids.length === 0) issues.push('Выберите хотя бы одну должность')
-    if (course.lesson_count === 0) issues.push('Добавьте хотя бы один урок')
-    const quiz = getCourseQuiz(db, course.id)
-    if (!quiz || quiz.question_count === 0) issues.push('Добавьте хотя бы один вопрос в итоговый тест')
+    if (positions === 0) issues.push('Выберите хотя бы одну должность')
+    if (lessons === 0) issues.push('Добавьте хотя бы один урок')
+    if (questions === 0) issues.push('Добавьте хотя бы один вопрос в итоговый тест')
+    return issues
+  }
+
+  function courseIssues(course: Course): string[] {
+    return courseIssuesOf(course.position_ids.length, course.lesson_count, getCourseQuiz(db, course.id)?.question_count ?? 0)
+  }
+
+  function quizIssuesOf(positions: number, questions: number): string[] {
+    const issues: string[] = []
+    if (positions === 0) issues.push('Выберите хотя бы одну должность')
+    if (questions === 0) issues.push('Добавьте хотя бы один вопрос')
     return issues
   }
 
@@ -119,6 +128,13 @@ export const learningRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
   app.patch('/api/learning/courses/:id', async (req, reply) => {
     const { id } = parse(idParams, req.params)
     const body = parse(courseBody, req.body)
+    const current = getCourse(db, id)
+    if (!current) return reply.code(404).send({ error: 'not_found' })
+    // опубликованный курс правим только целиком: иначе сотрудники получат курс без уроков или теста
+    if (current.status === 'published') {
+      const issues = courseIssuesOf(body.position_ids.length, body.lessons.length, body.questions.length)
+      if (issues.length) return reply.code(409).send({ error: 'incomplete', issues })
+    }
     const input: CourseInput = { title: body.title, description: body.description, due_days: body.due_days, pass_score: body.pass_score, position_ids: body.position_ids }
     const course = db.transaction(() => {
       const c = updateCourse(db, id, input)
@@ -177,6 +193,11 @@ export const learningRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     const body = parse(quizBody, req.body)
     const current = getQuiz(db, id)
     if (!current || current.course_id !== null) return reply.code(404).send({ error: 'not_found' })
+    // опубликованный тест правим только целиком: иначе он уйдёт сотрудникам без вопросов
+    if (current.status === 'published') {
+      const issues = quizIssuesOf(body.position_ids.length, body.questions.length)
+      if (issues.length) return reply.code(409).send({ error: 'incomplete', issues })
+    }
     const quiz = db.transaction(() => {
       const q = updateQuiz(db, id, { title: body.title, course_id: null, pass_score: body.pass_score, schedule: body.schedule, deadline_minutes: body.deadline_minutes, position_ids: body.position_ids }, quizNextRun({ schedule: body.schedule, status: current.status }))!
       replaceQuestions(db, q.id, body.questions)
@@ -189,9 +210,7 @@ export const learningRoutes: FastifyPluginAsync<Opts> = async (app, opts) => {
     const { id } = parse(idParams, req.params)
     const quiz = getQuiz(db, id)
     if (!quiz || quiz.course_id !== null) return reply.code(404).send({ error: 'not_found' })
-    const issues: string[] = []
-    if (quiz.position_ids.length === 0) issues.push('Выберите хотя бы одну должность')
-    if (quiz.question_count === 0) issues.push('Добавьте хотя бы один вопрос')
+    const issues = quizIssuesOf(quiz.position_ids.length, quiz.question_count)
     if (issues.length) return reply.code(409).send({ error: 'incomplete', issues })
     return setQuizStatus(db, id, 'published', quizNextRun({ schedule: quiz.schedule, status: 'published' }))
   })

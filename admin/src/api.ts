@@ -190,7 +190,7 @@ export const api = {
         r.onerror = () => reject(r.error)
         r.readAsDataURL(file)
       })
-      return request<{ path: string }>('POST', '/api/learning/upload', { filename: file.name, mime: file.type, data })
+      return request<{ path: string }>('POST', '/api/learning/upload', { mime: file.type, data })
     },
   },
 }
