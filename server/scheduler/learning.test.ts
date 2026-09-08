@@ -3,6 +3,7 @@ import { openDb, type Db } from '../db/connect.js'
 import { OWNER_TELEGRAM_ID, setSetting } from '../db/settings.js'
 import { publishCourse } from '../db/courses.js'
 import { getQuiz, setQuizStatus } from '../db/quizzes.js'
+import { createEmployee, linkTelegram, updateEmployee } from '../db/employees.js'
 import { createCourseAssignment, createQuizAssignment, getCourseAssignment, getQuizAssignment, listCourseAssignments, listQuizAssignments } from '../db/learningAssignments.js'
 import { fakeNotifier, type Notification } from '../test/buildTestApp.js'
 import { seedRestaurant } from '../test/fixtures.js'
@@ -25,6 +26,13 @@ beforeEach(() => {
 })
 
 describe('assignCourses', () => {
+  const PUBLISHED_AT = '2026-09-07T09:00:00.000Z'
+  const BEFORE = '2026-09-01T00:00:00.000Z'
+  const AFTER = '2026-09-07T09:30:00.000Z'
+  // фикстуры проставляют linked_at и position_changed_at по часам машины, поэтому в тестах задаём их явно
+  const setTimes = (employeeId: number, linkedAt: string, positionChangedAt: string) =>
+    db.prepare('update employees set linked_at = ?, position_changed_at = ? where id = ?').run(linkedAt, positionChangedAt, employeeId)
+
   it('assigns published courses to eligible employees, honouring assign_existing', async () => {
     const { course: all } = seedCourse(db, [seed.positions.barista.id])
     const { course: onlyNew } = seedCourse(db, [seed.positions.cook.id], { title: 'Кухня' })
@@ -34,6 +42,36 @@ describe('assignCourses', () => {
     expect(listCourseAssignments(db, { course_id: all.id })).toHaveLength(2)
     expect(listCourseAssignments(db, { course_id: onlyNew.id })).toHaveLength(0)
     expect(await assignCourses(deps, T('2026-09-07T10:01:00.000Z'))).toBe(0)
+  })
+
+  it('assigns an employee linked after publication to an "only new" course', async () => {
+    const { course } = seedCourse(db, [seed.positions.barista.id])
+    publishCourse(db, course.id, false, PUBLISHED_AT)
+    setTimes(seed.employees.ivan.id, BEFORE, BEFORE)
+    setTimes(seed.employees.anna.id, BEFORE, BEFORE)
+    expect(await assignCourses(deps, T('2026-09-07T10:00:00.000Z'))).toBe(0)
+
+    const newcomer = createEmployee(db, { full_name: 'Ольга Иванова', phone: '+79990000005', position_id: seed.positions.barista.id })
+    linkTelegram(db, newcomer.id, 505)
+    setTimes(newcomer.id, AFTER, BEFORE)
+    expect(await assignCourses(deps, T('2026-09-07T10:05:00.000Z'))).toBe(1)
+    expect(listCourseAssignments(db, { course_id: course.id }).map((a) => a.employee_id)).toEqual([newcomer.id])
+    expect(await assignCourses(deps, T('2026-09-07T10:06:00.000Z'))).toBe(0)
+  })
+
+  it('assigns an employee who moved to the course position after publication', async () => {
+    const { course } = seedCourse(db, [seed.positions.barista.id])
+    publishCourse(db, course.id, false, PUBLISHED_AT)
+    setTimes(seed.employees.ivan.id, BEFORE, BEFORE)
+    setTimes(seed.employees.anna.id, BEFORE, BEFORE)
+    setTimes(seed.employees.petr.id, BEFORE, BEFORE)
+    expect(await assignCourses(deps, T('2026-09-07T10:00:00.000Z'))).toBe(0)
+
+    updateEmployee(db, seed.employees.petr.id, { position_id: seed.positions.barista.id })
+    setTimes(seed.employees.petr.id, BEFORE, AFTER)
+    expect(await assignCourses(deps, T('2026-09-07T10:05:00.000Z'))).toBe(1)
+    expect(listCourseAssignments(db, { course_id: course.id }).map((a) => a.employee_id)).toEqual([seed.employees.petr.id])
+    expect(await assignCourses(deps, T('2026-09-07T10:06:00.000Z'))).toBe(0)
   })
 })
 
@@ -78,6 +116,25 @@ describe('learningOverdue', () => {
     expect(log.filter((n) => n.to === 'owner')).toHaveLength(2)
     expect(log.filter((n) => n.to === 500 || n.to === 501)).toHaveLength(2)
     expect(await learningOverdue(deps, T('2026-09-07T10:01:00.000Z'))).toBe(0)
+  })
+
+  it('notifies once about a course and its final exam, leaving the exam passable', async () => {
+    const { course, quiz } = seedCourse(db, [seed.positions.barista.id])
+    const ca = createCourseAssignment(db, { course_id: course.id, employee_id: seed.employees.ivan.id, assigned_at: '2026-09-01T10:00:00.000Z', due_at: '2026-09-06T10:00:00.000Z' })!
+    const qa = createQuizAssignment(db, {
+      quiz_id: quiz.id, employee_id: seed.employees.ivan.id, course_assignment_id: ca.id,
+      slot_at: '2026-09-01T10:00:00.000Z', assigned_at: '2026-09-01T10:00:00.000Z', due_at: '2026-09-06T10:00:00.000Z',
+    })!
+    // напоминание тоже одно: про курс, а не про его же итоговый тест
+    expect(await learningReminders(deps, T('2026-09-05T12:00:00.000Z'))).toBe(1)
+    expect(log.filter((n) => /Напоминание/.test(n.text))).toHaveLength(1)
+
+    expect(await learningOverdue(deps, T('2026-09-07T10:00:00.000Z'))).toBe(1)
+    expect(getCourseAssignment(db, ca.id)?.status).toBe('overdue')
+    // просрочку несёт курс, тест остаётся pending — его ещё можно сдать
+    expect(getQuizAssignment(db, qa.id)?.status).toBe('pending')
+    expect(log.filter((n) => n.to === 'owner')).toHaveLength(1)
+    expect(log.filter((n) => n.to === 500 && /просрочен/.test(n.text))).toHaveLength(1)
   })
 
   it('continues with the remaining items when one notification throws', async () => {

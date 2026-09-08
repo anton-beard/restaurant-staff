@@ -154,16 +154,20 @@ export function setQuizAssignmentStatus(db: Db, id: number, status: QuizAssignme
   db.prepare('update quiz_assignments set status = ? where id = ?').run(status, id)
 }
 
+/** Итоговые тесты курсов сюда не попадают: за них напоминает и просрочивает само назначение курса. */
 export function listQuizReminderCandidates(db: Db, nowIso: string): QuizAssignment[] {
-  return db.prepare(`select ${qaCols} from quiz_assignments a where a.status = 'pending' and a.reminder_sent_at is null and a.due_at > ? order by a.due_at`).all(nowIso) as QuizAssignment[]
+  return db.prepare(`select ${qaCols} from quiz_assignments a
+    where a.status = 'pending' and a.course_assignment_id is null and a.reminder_sent_at is null and a.due_at > ? order by a.due_at`).all(nowIso) as QuizAssignment[]
 }
 
 export function markQuizReminderSent(db: Db, id: number, nowIso: string): void {
   db.prepare('update quiz_assignments set reminder_sent_at = ? where id = ?').run(nowIso, id)
 }
 
+/** Итоговые тесты курсов сюда не попадают: просрочку несёт курс, а тест остаётся pending и его можно сдать. */
 export function listQuizOverdueCandidates(db: Db, nowIso: string): QuizAssignment[] {
-  return db.prepare(`select ${qaCols} from quiz_assignments a where a.status = 'pending' and a.due_at < ? order by a.due_at`).all(nowIso) as QuizAssignment[]
+  return db.prepare(`select ${qaCols} from quiz_assignments a
+    where a.status = 'pending' and a.course_assignment_id is null and a.due_at < ? order by a.due_at`).all(nowIso) as QuizAssignment[]
 }
 
 export type QuizAttempt = {
