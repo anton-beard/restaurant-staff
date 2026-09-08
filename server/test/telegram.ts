@@ -1,4 +1,4 @@
-import type { Bot } from 'grammy'
+import { Bot, type Api } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 
 export const botInfo: UserFromGetMe = {
@@ -45,11 +45,53 @@ export function contactUpdate(fromId: number, phone: string, contactUserId = fro
   }
 }
 
-export function captureApi(bot: Bot) {
-  const calls: { method: string; payload: Record<string, unknown> }[] = []
-  bot.api.config.use(async (_prev, method, payload) => {
-    calls.push({ method, payload: payload as Record<string, unknown> })
+export type ApiCall = { method: string; payload: Record<string, unknown> }
+type Responder = (payload: Record<string, unknown>) => unknown
+
+let messageCounter = 100
+
+export function captureApi(
+  target: Api | Bot,
+  responders: Record<string, Responder> = {},
+  calls: ApiCall[] = [],
+): ApiCall[] {
+  const api = target instanceof Bot ? target.api : target
+  api.config.use(async (_prev, method, payload) => {
+    const p = payload as Record<string, unknown>
+    calls.push({ method, payload: p })
+    const custom = responders[method]
+    if (custom) return { ok: true, result: custom(p) }
+    if (method === 'sendMessage' || method === 'sendPhoto') {
+      return { ok: true, result: { message_id: ++messageCounter } }
+    }
+    if (method === 'sendMediaGroup') return { ok: true, result: [] }
     return { ok: true, result: true }
   })
   return calls
+}
+
+export function photoUpdate(fromId: number, fileId: string, uniqueId: string): Update {
+  return {
+    update_id: ++updateId,
+    message: {
+      ...base(fromId, 'User'),
+      photo: [
+        { file_id: `${fileId}-s`, file_unique_id: `${uniqueId}-s`, width: 90, height: 90 },
+        { file_id: fileId, file_unique_id: uniqueId, width: 1280, height: 960 },
+      ],
+    },
+  }
+}
+
+export function callbackUpdate(fromId: number, data: string, messageId = 1): Update {
+  return {
+    update_id: ++updateId,
+    callback_query: {
+      id: String(++updateId),
+      from: { id: fromId, is_bot: false, first_name: 'User' },
+      chat_instance: 'ci',
+      data,
+      message: { ...base(fromId, 'User'), message_id: messageId, text: 'x' },
+    },
+  }
 }

@@ -4,18 +4,16 @@ import { openDb, type Db } from '../db/connect.js'
 import { createPosition } from '../db/positions.js'
 import { archiveEmployee, createEmployee, getEmployee, linkTelegram } from '../db/employees.js'
 import { getSetting, OWNER_TELEGRAM_ID, setSetting } from '../db/settings.js'
-import { botInfo, captureApi, contactUpdate, textUpdate } from '../test/telegram.js'
-import { createBot } from './createBot.js'
+import { contactUpdate, textUpdate, type ApiCall } from '../test/telegram.js'
+import { makeBot, OWNER_PHONE } from '../test/bot.js'
 
-const OWNER_PHONE = '+79990000000'
 let db: Db
 let bot: Bot
-let calls: ReturnType<typeof captureApi>
+let calls: ApiCall[]
 
 beforeEach(() => {
   db = openDb(':memory:')
-  bot = createBot({ token: 'test', db, ownerPhone: OWNER_PHONE, botInfo, publicUrl: 'https://admin.example' })
-  calls = captureApi(bot)
+  ;({ bot, calls } = makeBot(db))
   createPosition(db, 'Официант')
   createEmployee(db, { full_name: 'Иван Петров', phone: '+79990000001', position_id: 1 })
 })
@@ -97,8 +95,7 @@ describe('linking', () => {
 
 describe('errors', () => {
   it('answers with an apology when a handler throws', async () => {
-    const failing = createBot({ token: 'test', db, ownerPhone: OWNER_PHONE, botInfo })
-    const failingCalls = captureApi(failing)
+    const { bot: failing, calls: failingCalls } = makeBot(db)
     // Installed last, so it wraps the capture: the first reply fails, the apology is recorded.
     let fail = true
     failing.api.config.use(async (prev, method, payload, signal) => {
@@ -121,7 +118,7 @@ describe('menus', () => {
     linkTelegram(db, 1, 500)
     await bot.handleUpdate(textUpdate(500, '/start'))
     expect(lastMarkup()).toContain('Мои задания')
-    await bot.handleUpdate(textUpdate(500, 'Мои задания'))
+    await bot.handleUpdate(textUpdate(500, 'Обучение'))
     expect(lastText()).toMatch(/появится/i)
   })
 

@@ -6,7 +6,7 @@ import { buildApp } from './app.js'
 import { loadConfig } from './config.js'
 import { openDb } from './db/connect.js'
 import { createOwnerAuth } from './auth/ownerAuth.js'
-import { buildTestApp } from './test/buildTestApp.js'
+import { buildTestApp, fakeNotifier, testEnv } from './test/buildTestApp.js'
 
 describe('app', () => {
   it('answers /healthz', async () => {
@@ -25,10 +25,10 @@ describe('admin static', () => {
       writeFileSync(join(dir, 'index.html'), '<h1>admin</h1>')
       const db = openDb(':memory:')
       const app = buildApp({
-        config: loadConfig({ BOT_TOKEN: 't', OWNER_PHONE: '+79990000000', SESSION_SECRET: 'sixteen-characters!' }),
+        config: loadConfig(testEnv),
         db,
         auth: createOwnerAuth(db),
-        sendToOwner: async () => true,
+        notifier: fakeNotifier([]),
         adminDistDir: dir,
       })
       const root = await app.inject({ method: 'GET', url: '/' })

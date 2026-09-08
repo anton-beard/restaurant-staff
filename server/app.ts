@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import type { Config } from './config.js'
 import type { Db } from './db/connect.js'
 import type { OwnerAuth } from './auth/ownerAuth.js'
+import type { Notifier } from './notify.js'
 import { ValidationError } from './lib/validate.js'
 import { authRoutes } from './api/auth.js'
 import { requireOwner } from './api/requireOwner.js'
@@ -20,12 +21,12 @@ export type AppDeps = {
   config: Config
   db: Db
   auth: OwnerAuth
-  sendToOwner: (text: string) => Promise<boolean>
+  notifier: Notifier
   adminDistDir?: string
 }
 
 export function buildApp(deps: AppDeps): FastifyInstance {
-  const { config, db, auth, sendToOwner } = deps
+  const { config, db, auth, notifier } = deps
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' })
 
   app.register(fastifyCookie, { secret: config.SESSION_SECRET })
@@ -50,7 +51,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(authRoutes, {
     db,
     auth,
-    sendToOwner,
+    notifier,
     // The Docker image sets NODE_ENV=production, so a container always gets a secure cookie.
     secureCookie:
       process.env.NODE_ENV === 'production' || (config.PUBLIC_URL?.startsWith('https://') ?? false),

@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { Api } from 'grammy'
 import { loadConfig } from './config.js'
 import { openDb } from './db/connect.js'
 import { createOwnerAuth } from './auth/ownerAuth.js'
 import { createBot } from './bot/createBot.js'
-import { notifyOwner } from './notify.js'
+import { createTelegramNotifier } from './notify.js'
 import { buildApp } from './app.js'
 
 const config = loadConfig()
@@ -19,19 +20,13 @@ const adminDistDir = adminCandidates.find(existsSync) ?? adminCandidates[0]!
 
 const db = openDb(join(config.DATA_DIR, 'app.db'))
 const auth = createOwnerAuth(db)
+const api = new Api(config.BOT_TOKEN)
+const notifier = createTelegramNotifier(api, db)
 const bot = createBot({
   token: config.BOT_TOKEN,
-  db,
-  ownerPhone: config.OWNER_PHONE,
-  publicUrl: config.PUBLIC_URL,
+  deps: { db, ownerPhone: config.OWNER_PHONE, publicUrl: config.PUBLIC_URL, notifier, tz: config.TZ },
 })
-const app = buildApp({
-  config,
-  db,
-  auth,
-  sendToOwner: (text) => notifyOwner(bot.api, db, text),
-  adminDistDir,
-})
+const app = buildApp({ config, db, auth, notifier, adminDistDir })
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' })
 bot

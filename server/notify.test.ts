@@ -1,40 +1,51 @@
-import { Api } from 'grammy'
+import { Api, InlineKeyboard } from 'grammy'
 import { describe, expect, it } from 'vitest'
 import { openDb } from './db/connect.js'
 import { OWNER_TELEGRAM_ID, setSetting } from './db/settings.js'
-import { notifyOwner } from './notify.js'
+import { createTelegramNotifier } from './notify.js'
+import { captureApi } from './test/telegram.js'
 
-function fakeApi(fail = false) {
+function setup(ownerLinked = true) {
+  const db = openDb(':memory:')
+  if (ownerLinked) setSetting(db, OWNER_TELEGRAM_ID, '42')
   const api = new Api('test')
-  const calls: { method: string; payload: Record<string, unknown> }[] = []
-  api.config.use(async (_prev, method, payload) => {
-    calls.push({ method, payload: payload as Record<string, unknown> })
-    if (fail) return { ok: false, error_code: 403, description: 'blocked' }
-    return { ok: true, result: true }
-  })
-  return { api, calls }
+  const calls = captureApi(api)
+  return { db, api, calls, notifier: createTelegramNotifier(api, db) }
 }
 
-describe('notifyOwner', () => {
-  it('returns false when the owner is not linked', async () => {
-    const db = openDb(':memory:')
-    const { api, calls } = fakeApi()
-    expect(await notifyOwner(api, db, 'hi')).toBe(false)
+describe('notifier', () => {
+  it('toOwner returns null when the owner is not linked', async () => {
+    const { notifier, calls } = setup(false)
+    expect(await notifier.toOwner('hi')).toBeNull()
     expect(calls).toEqual([])
   })
 
-  it('sends a message to the owner chat', async () => {
-    const db = openDb(':memory:')
-    setSetting(db, OWNER_TELEGRAM_ID, '42')
-    const { api, calls } = fakeApi()
-    expect(await notifyOwner(api, db, 'hi')).toBe(true)
+  it('toOwner and toEmployee return the message id and pass the keyboard', async () => {
+    const { notifier, calls } = setup()
+    const kb = new InlineKeyboard().text('Ок', 'x')
+    expect(await notifier.toOwner('hi', { keyboard: kb })).toBeTypeOf('number')
     expect(calls[0]).toMatchObject({ method: 'sendMessage', payload: { chat_id: 42, text: 'hi' } })
+    expect(JSON.stringify(calls[0]!.payload.reply_markup)).toContain('"callback_data":"x"')
+    expect(await notifier.toEmployee(500, 'yo')).toBeTypeOf('number')
+    expect(calls[1]!.payload.chat_id).toBe(500)
   })
 
-  it('returns false when telegram fails', async () => {
+  it('returns null when telegram fails', async () => {
     const db = openDb(':memory:')
     setSetting(db, OWNER_TELEGRAM_ID, '42')
-    const { api } = fakeApi(true)
-    expect(await notifyOwner(api, db, 'hi')).toBe(false)
+    const api = new Api('test')
+    api.config.use(async () => ({ ok: false, error_code: 403, description: 'blocked' }))
+    const notifier = createTelegramNotifier(api, db)
+    expect(await notifier.toOwner('hi')).toBeNull()
+    expect(await notifier.editMessage(42, 1, 'x')).toBe(false)
+  })
+
+  it('photosToOwner sends one photo with caption or a media group plus a message', async () => {
+    const { notifier, calls } = setup()
+    expect(await notifier.photosToOwner(['/tmp/a.jpg'], 'cap')).toBe(true)
+    expect(calls[0]).toMatchObject({ method: 'sendPhoto', payload: { chat_id: 42, caption: 'cap' } })
+    calls.length = 0
+    expect(await notifier.photosToOwner(['/tmp/a.jpg', '/tmp/b.jpg'], 'cap')).toBe(true)
+    expect(calls.map((c) => c.method)).toEqual(['sendMediaGroup', 'sendMessage'])
   })
 })

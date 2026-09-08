@@ -5,6 +5,7 @@ const base = {
   BOT_TOKEN: 't',
   OWNER_PHONE: '+79990000000',
   SESSION_SECRET: 'sixteen-characters!',
+  ANTHROPIC_API_KEY: 'k',
 }
 
 describe('loadConfig', () => {
@@ -23,5 +24,12 @@ describe('loadConfig', () => {
 
   it('throws on missing BOT_TOKEN', () => {
     expect(() => loadConfig({ ...base, BOT_TOKEN: '' })).toThrow(/BOT_TOKEN/)
+  })
+
+  it('defaults AI_MODEL and TZ, requires ANTHROPIC_API_KEY', () => {
+    const c = loadConfig(base)
+    expect(c.AI_MODEL).toBe('claude-sonnet-5')
+    expect(c.TZ).toBe('Europe/Moscow')
+    expect(() => loadConfig({ ...base, ANTHROPIC_API_KEY: '' })).toThrow(/ANTHROPIC_API_KEY/)
   })
 })
