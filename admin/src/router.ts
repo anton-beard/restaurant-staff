@@ -8,6 +8,11 @@ import TemplatesPage from './pages/TemplatesPage.vue'
 import TemplateForm from './pages/TemplateForm.vue'
 import InstancesPage from './pages/InstancesPage.vue'
 import ReviewPage from './pages/ReviewPage.vue'
+import CoursesPage from './pages/CoursesPage.vue'
+import CourseForm from './pages/CourseForm.vue'
+import QuizzesPage from './pages/QuizzesPage.vue'
+import QuizForm from './pages/QuizForm.vue'
+import ProgressPage from './pages/ProgressPage.vue'
 
 let authed = false
 export function setAuthed(value: boolean) {
@@ -30,6 +35,13 @@ export const router = createRouter({
         { path: 'review', component: ReviewPage },
         { path: 'employees', component: EmployeesPage },
         { path: 'positions', component: PositionsPage },
+        { path: 'learning/courses', component: CoursesPage },
+        { path: 'learning/courses/new', component: CourseForm },
+        { path: 'learning/courses/:id/edit', component: CourseForm, props: true },
+        { path: 'learning/quizzes', component: QuizzesPage },
+        { path: 'learning/quizzes/new', component: QuizForm },
+        { path: 'learning/quizzes/:id/edit', component: QuizForm, props: true },
+        { path: 'learning/progress', component: ProgressPage },
       ],
     },
   ],

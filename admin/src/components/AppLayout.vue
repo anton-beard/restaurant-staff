@@ -24,7 +24,7 @@ async function logout() {
 <template>
   <div class="min-h-screen">
     <header class="bg-white border-b">
-      <nav class="max-w-5xl mx-auto px-4 h-14 flex items-center gap-6">
+      <nav class="max-w-5xl mx-auto px-4 py-2 flex flex-wrap items-center gap-6">
         <span class="font-semibold">Ресторан</span>
         <RouterLink to="/tasks" class="text-sm hover:underline" active-class="font-semibold">Задания</RouterLink>
         <RouterLink to="/journal" class="text-sm hover:underline" active-class="font-semibold">Журнал</RouterLink>
@@ -32,6 +32,9 @@ async function logout() {
           Проверка фото
           <span v-if="reviewCount" class="ml-1 rounded-full bg-red-600 text-white text-xs px-2 py-0.5">{{ reviewCount }}</span>
         </RouterLink>
+        <RouterLink to="/learning/courses" class="text-sm hover:underline" active-class="font-semibold">Курсы</RouterLink>
+        <RouterLink to="/learning/quizzes" class="text-sm hover:underline" active-class="font-semibold">Тесты</RouterLink>
+        <RouterLink to="/learning/progress" class="text-sm hover:underline" active-class="font-semibold">Прогресс</RouterLink>
         <RouterLink to="/employees" class="text-sm hover:underline" active-class="font-semibold">
           Сотрудники
         </RouterLink>

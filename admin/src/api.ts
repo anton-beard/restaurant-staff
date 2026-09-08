@@ -1,7 +1,7 @@
 export class ApiError extends Error {
   constructor(
     public status: number,
-    public body: { error?: string; issues?: { message: string }[] } | null,
+    public body: { error?: string; issues?: ({ message: string } | string)[] } | null,
   ) {
     super(`HTTP ${status}`)
   }
@@ -91,6 +91,31 @@ export type Submission = {
 export type ReviewRow = Submission & { instance_id: number; title: string; photo_criteria: string | null; employee_name: string }
 export type InstanceFilters = { status?: InstanceStatus; employee_id?: number; template_id?: number }
 
+export type Media = { kind: 'image'; path: string } | { kind: 'video'; url: string }
+export type Lesson = { id?: number; title: string; body: string; media: Media[] }
+export type Question = { id?: number; text: string; options: string[]; correct_index: number }
+export type Course = {
+  id: number; title: string; description: string; due_days: number; pass_score: number
+  status: 'draft' | 'published' | 'archived'; published_at: string | null; assign_existing: boolean
+  created_at: string; position_ids: number[]; lesson_count: number
+}
+export type CourseBody = { title: string; description: string; due_days: number; pass_score: number; position_ids: number[]; lessons: Lesson[]; questions: Question[] }
+export type CourseDetails = { course: Course; lessons: Lesson[]; quiz: Quiz | null; questions: Question[] }
+export type Quiz = {
+  id: number; title: string; course_id: number | null; pass_score: number; schedule: Schedule | null; deadline_minutes: number | null
+  status: 'draft' | 'published' | 'archived'; next_run_at: string | null; created_at: string; position_ids: number[]; question_count: number
+}
+export type QuizBody = { title: string; pass_score: number; position_ids: number[]; schedule: Schedule | null; deadline_minutes: number; questions: Question[] }
+export type CourseAssignmentRow = {
+  id: number; course_id: number; employee_id: number; assigned_at: string; due_at: string; current_lesson: number
+  status: 'in_progress' | 'completed' | 'overdue'; completed_at: string | null; title: string; lesson_count: number; employee_name: string
+}
+export type QuizAssignmentRow = {
+  id: number; quiz_id: number; employee_id: number; course_assignment_id: number | null; slot_at: string; assigned_at: string; due_at: string
+  status: 'pending' | 'passed' | 'overdue'; passed_at: string | null; title: string; employee_name: string; open_attempt_id: number | null; course_id: number | null
+}
+export type QuizAttempt = { id: number; started_at: string; finished_at: string | null; current_question: number; answers: number[]; score: number | null; passed: boolean | null }
+
 function qs(params: Record<string, string | number | undefined>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
   return entries.length ? '?' + entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : ''
@@ -135,11 +160,44 @@ export const api = {
     decide: (id: number, decision: 'accept' | 'reject', comment?: string) =>
       request<{ ok: true }>('POST', `/api/tasks/submissions/${id}/decide`, { decision, comment }),
   },
+  learning: {
+    courses: {
+      list: (includeArchived = true) => request<Course[]>('GET', `/api/learning/courses${includeArchived ? '?includeArchived=1' : ''}`),
+      get: (id: number) => request<CourseDetails>('GET', `/api/learning/courses/${id}`),
+      create: (body: CourseBody) => request<CourseDetails>('POST', '/api/learning/courses', body),
+      update: (id: number, body: CourseBody) => request<CourseDetails>('PATCH', `/api/learning/courses/${id}`, body),
+      publish: (id: number, assignExisting: boolean) => request<{ course: Course; assigned: number }>('POST', `/api/learning/courses/${id}/publish`, { assign_existing: assignExisting }),
+      archive: (id: number) => request<Course>('POST', `/api/learning/courses/${id}/archive`),
+    },
+    quizzes: {
+      list: (includeArchived = true) => request<Quiz[]>('GET', `/api/learning/quizzes${includeArchived ? '?includeArchived=1' : ''}`),
+      get: (id: number) => request<{ quiz: Quiz; questions: Question[] }>('GET', `/api/learning/quizzes/${id}`),
+      create: (body: QuizBody) => request<{ quiz: Quiz; questions: Question[] }>('POST', '/api/learning/quizzes', body),
+      update: (id: number, body: QuizBody) => request<{ quiz: Quiz; questions: Question[] }>('PATCH', `/api/learning/quizzes/${id}`, body),
+      publish: (id: number) => request<Quiz>('POST', `/api/learning/quizzes/${id}/publish`),
+      issue: (id: number) => request<{ assigned: number }>('POST', `/api/learning/quizzes/${id}/issue`),
+      archive: (id: number) => request<Quiz>('POST', `/api/learning/quizzes/${id}/archive`),
+    },
+    assignments: {
+      courses: (f: { course_id?: number; employee_id?: number; status?: string }) => request<CourseAssignmentRow[]>('GET', `/api/learning/assignments/courses${qs(f)}`),
+      quizzes: (f: { quiz_id?: number; employee_id?: number; status?: string }) => request<QuizAssignmentRow[]>('GET', `/api/learning/assignments/quizzes${qs(f)}`),
+      attempts: (id: number) => request<QuizAttempt[]>('GET', `/api/learning/assignments/quizzes/${id}/attempts`),
+    },
+    upload: async (file: File) => {
+      const data = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = () => resolve(String(r.result).split(',')[1] ?? '')
+        r.onerror = () => reject(r.error)
+        r.readAsDataURL(file)
+      })
+      return request<{ path: string }>('POST', '/api/learning/upload', { filename: file.name, mime: file.type, data })
+    },
+  },
 }
 
 export function errorText(err: unknown, map: Record<string, string> = {}): string {
   if (err instanceof ApiError) {
-    if (err.body?.issues?.length) return map.validation ?? err.body.issues.map((i) => i.message).join('. ')
+    if (err.body?.issues?.length) return map.validation ?? err.body.issues.map((i) => (typeof i === 'string' ? i : i.message)).join('. ')
     const key = err.body?.error ?? String(err.status)
     return map[key] ?? map[String(err.status)] ?? `Ошибка ${err.status}`
   }
