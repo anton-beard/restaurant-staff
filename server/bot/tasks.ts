@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Bot, Context } from 'grammy'
-import { clearState, getState, setState } from '../db/botStates.js'
+import type { Bot } from 'grammy'
+import { clearState, setState } from '../db/botStates.js'
 import { claimInstance, getInstanceRow, listEmployeeInstances, listOffers, setInstanceStatus, type InstanceRow } from '../db/taskInstances.js'
 import { getTaskTemplate } from '../db/taskTemplates.js'
 import { createSubmission, photoExists } from '../db/taskSubmissions.js'
@@ -10,13 +10,9 @@ import { CB_RE } from './callbacks.js'
 import type { BotDeps } from './deps.js'
 import { BTN, employeeMenu, openTaskKeyboard, photoCollectKeyboard, taskCardKeyboard } from './keyboards.js'
 import { showHome } from './linking.js'
-import { roleOf } from './roles.js'
+import { employeeOf, onState, type BotContext, type CollectingState } from './states.js'
 
-export type CollectingState = {
-  kind: 'collecting_photos'
-  instance_id: number
-  photos: { path: string; fileUniqueId: string }[]
-}
+export type { CollectingState } from './states.js'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'ждёт выполнения',
@@ -24,42 +20,95 @@ const STATUS_LABEL: Record<string, string> = {
   review: 'на проверке у владельца',
 }
 
-const collecting = (deps: BotDeps, telegramId: number): CollectingState | null => {
-  const s = getState<CollectingState>(deps.db, telegramId)
-  return s?.kind === 'collecting_photos' ? s : null
+async function sendCard(ctx: BotContext, deps: BotDeps, row: InstanceRow): Promise<void> {
+  const { db } = deps
+  const t = getTaskTemplate(db, row.template_id)
+  const lines = [row.title]
+  if (t?.description) lines.push(t.description)
+  if (row.requires_photo && t?.photo_criteria) lines.push(`Что должно быть на фото: ${t.photo_criteria}`)
+  lines.push(taskDueText(new Date(row.due_at), deps.tz, deps.now()))
+  await ctx.reply(lines.join('\n'), { reply_markup: taskCardKeyboard(row.id, row.requires_photo) })
 }
 
-export function registerTasks(bot: Bot, deps: BotDeps): void {
+/** Возвращает экземпляр, если он принадлежит сотруднику и в статусе pending; иначе отвечает на callback и null. */
+async function ownPending(ctx: BotContext, deps: BotDeps, id: number, employeeId: number): Promise<InstanceRow | null> {
+  const row = getInstanceRow(deps.db, id)
+  if (!row || row.employee_id !== employeeId) {
+    await ctx.answerCallbackQuery({ text: 'Это не ваше задание.' })
+    return null
+  }
+  if (row.status !== 'pending') {
+    await ctx.answerCallbackQuery({ text: 'Задание уже не активно.' })
+    return null
+  }
+  return row
+}
+
+/** Завершает сбор фото: создаёт сдачу и отправляет её на проверку. */
+async function finishCollection(ctx: BotContext, deps: BotDeps, state: CollectingState): Promise<void> {
   const { db } = deps
-
-  function employeeOf(ctx: Context) {
-    if (!ctx.from) return null
-    const role = roleOf(db, ctx.from.id)
-    return role.kind === 'employee' ? role.employee : null
+  if (state.photos.length === 0) {
+    await ctx.reply('Нужно хотя бы одно фото.')
+    return
   }
-
-  async function sendCard(ctx: Context, row: InstanceRow): Promise<void> {
-    const t = getTaskTemplate(db, row.template_id)
-    const lines = [row.title]
-    if (t?.description) lines.push(t.description)
-    if (row.requires_photo && t?.photo_criteria) lines.push(`Что должно быть на фото: ${t.photo_criteria}`)
-    lines.push(taskDueText(new Date(row.due_at), deps.tz, deps.now()))
-    await ctx.reply(lines.join('\n'), { reply_markup: taskCardKeyboard(row.id, row.requires_photo) })
+  const row = getInstanceRow(db, state.instance_id)
+  if (!row || row.status !== 'pending') {
+    clearState(db, ctx.from!.id)
+    await ctx.reply('Задание уже не активно.', { reply_markup: employeeMenu() })
+    return
   }
+  const submission = createSubmission(db, row.id, deps.now().toISOString(), state.photos)
+  setInstanceStatus(db, row.id, 'submitted')
+  clearState(db, ctx.from!.id)
+  await ctx.reply('Проверяю, это займёт до минуты.', { reply_markup: employeeMenu() })
+  deps.onSubmission(submission.id)
+}
 
-  /** Возвращает экземпляр, если он принадлежит сотруднику и в статусе pending; иначе отвечает на callback и null. */
-  async function ownPending(ctx: Context, id: number, employeeId: number): Promise<InstanceRow | null> {
-    const row = getInstanceRow(db, id)
-    if (!row || row.employee_id !== employeeId) {
-      await ctx.answerCallbackQuery({ text: 'Это не ваше задание.' })
-      return null
+/** Отменяет сбор фото и удаляет уже загруженные файлы. */
+async function cancelCollection(ctx: BotContext, deps: BotDeps, state: CollectingState): Promise<void> {
+  for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
+  clearState(deps.db, ctx.from!.id)
+  await ctx.reply('Отменено.', { reply_markup: employeeMenu() })
+}
+
+export function registerTaskStates(bot: Bot<BotContext>, deps: BotDeps): void {
+  const { db } = deps
+  onState(bot, 'collecting_photos', async (ctx) => {
+    const state = ctx.state
+    if (ctx.message.photo) {
+      if (state.photos.length >= 3) {
+        await ctx.reply('Максимум 3 фото.')
+        return
+      }
+      const best = ctx.message.photo.at(-1)!
+      const dup = photoExists(db, best.file_unique_id) || state.photos.some((p) => p.fileUniqueId === best.file_unique_id)
+      if (dup) {
+        await ctx.reply('Это фото уже отправляли, снимите заново.')
+        return
+      }
+      const file = await ctx.getFile()
+      if (!file.file_path) throw new Error('telegram returned no file_path')
+      const data = await deps.downloadFile(file.file_path)
+      const n = state.photos.length + 1
+      const rel = join(String(state.instance_id), `${deps.now().getTime()}-${n}.jpg`)
+      mkdirSync(join(deps.uploadsDir, String(state.instance_id)), { recursive: true })
+      writeFileSync(join(deps.uploadsDir, rel), data)
+      state.photos.push({ path: rel, fileUniqueId: best.file_unique_id })
+      setState(db, ctx.from!.id, state)
+      await ctx.reply(`Фото ${n} из 3 получено.`)
+      return
     }
-    if (row.status !== 'pending') {
-      await ctx.answerCallbackQuery({ text: 'Задание уже не активно.' })
-      return null
-    }
-    return row
-  }
+    const text = ctx.message.text?.trim().toLowerCase()
+    if (text === BTN.photosDone.toLowerCase()) return finishCollection(ctx, deps, state)
+    if (text === BTN.cancel.toLowerCase()) return cancelCollection(ctx, deps, state)
+    await ctx.reply('Сейчас идёт отправка фото. Пришлите фото, затем нажмите Готово, или нажмите Отмена.', {
+      reply_markup: photoCollectKeyboard(),
+    })
+  })
+}
+
+export function registerTasks(bot: Bot<BotContext>, deps: BotDeps): void {
+  const { db } = deps
 
   bot.hears(BTN.tasks, async (ctx) => {
     const emp = employeeOf(ctx)
@@ -78,16 +127,16 @@ export function registerTasks(bot: Bot, deps: BotDeps): void {
   bot.callbackQuery(CB_RE.open, async (ctx) => {
     const emp = employeeOf(ctx)
     if (!emp) return ctx.answerCallbackQuery()
-    const row = await ownPending(ctx, Number(ctx.match[1]), emp.id)
+    const row = await ownPending(ctx, deps, Number(ctx.match[1]), emp.id)
     if (!row) return
     await ctx.answerCallbackQuery()
-    await sendCard(ctx, row)
+    await sendCard(ctx, deps, row)
   })
 
   bot.callbackQuery(CB_RE.done, async (ctx) => {
     const emp = employeeOf(ctx)
     if (!emp) return ctx.answerCallbackQuery()
-    const row = await ownPending(ctx, Number(ctx.match[1]), emp.id)
+    const row = await ownPending(ctx, deps, Number(ctx.match[1]), emp.id)
     if (!row) return
     if (row.requires_photo) return ctx.answerCallbackQuery({ text: 'Для этого задания нужно фото.' })
     setInstanceStatus(db, row.id, 'accepted', { completed_at: deps.now().toISOString() })
@@ -98,9 +147,9 @@ export function registerTasks(bot: Bot, deps: BotDeps): void {
   bot.callbackQuery(CB_RE.photo, async (ctx) => {
     const emp = employeeOf(ctx)
     if (!emp) return ctx.answerCallbackQuery()
-    const row = await ownPending(ctx, Number(ctx.match[1]), emp.id)
+    const row = await ownPending(ctx, deps, Number(ctx.match[1]), emp.id)
     if (!row) return
-    setState(db, ctx.from.id, { kind: 'collecting_photos', instance_id: row.id, photos: [] } satisfies CollectingState)
+    setState(db, ctx.from!.id, { kind: 'collecting_photos', instance_id: row.id, photos: [] } satisfies CollectingState)
     await ctx.answerCallbackQuery()
     await ctx.reply('Пришлите до 3 фото, потом нажмите Готово.', { reply_markup: photoCollectKeyboard() })
   })
@@ -115,92 +164,17 @@ export function registerTasks(bot: Bot, deps: BotDeps): void {
     await ctx.answerCallbackQuery({ text: 'Задание ваше.' })
     const row = getInstanceRow(db, id)!
     for (const offer of listOffers(db, id)) {
-      if (offer.telegram_id === ctx.from.id) continue
+      if (offer.telegram_id === ctx.from!.id) continue
       await deps.notifier.editMessage(offer.telegram_id, offer.message_id, `${row.title}\nВзял(а) ${emp.full_name}`)
     }
-    await sendCard(ctx, row)
+    await sendCard(ctx, deps, row)
   })
 
   bot.on('message:photo', async (ctx, next) => {
-    const state = collecting(deps, ctx.from.id)
-    if (!state) {
-      if (!employeeOf(ctx)) return next()
+    if (employeeOf(ctx)) {
       await ctx.reply('Сначала откройте задание и нажмите «Отправить фото».')
       return
     }
-    if (state.photos.length >= 3) {
-      await ctx.reply('Максимум 3 фото.')
-      return
-    }
-    const best = ctx.message.photo.at(-1)!
-    const dup = photoExists(db, best.file_unique_id) || state.photos.some((p) => p.fileUniqueId === best.file_unique_id)
-    if (dup) {
-      await ctx.reply('Это фото уже отправляли, снимите заново.')
-      return
-    }
-    const file = await ctx.getFile()
-    if (!file.file_path) throw new Error('telegram returned no file_path')
-    const data = await deps.downloadFile(file.file_path)
-    const n = state.photos.length + 1
-    const rel = join(String(state.instance_id), `${deps.now().getTime()}-${n}.jpg`)
-    mkdirSync(join(deps.uploadsDir, String(state.instance_id)), { recursive: true })
-    writeFileSync(join(deps.uploadsDir, rel), data)
-    state.photos.push({ path: rel, fileUniqueId: best.file_unique_id })
-    setState(db, ctx.from.id, state)
-    await ctx.reply(`Фото ${n} из 3 получено.`)
-  })
-
-  /** Завершает сбор фото: создаёт сдачу и отправляет её на проверку. */
-  async function finishCollection(ctx: Context, state: CollectingState): Promise<void> {
-    if (state.photos.length === 0) {
-      await ctx.reply('Нужно хотя бы одно фото.')
-      return
-    }
-    const row = getInstanceRow(db, state.instance_id)
-    if (!row || row.status !== 'pending') {
-      clearState(db, ctx.from!.id)
-      await ctx.reply('Задание уже не активно.', { reply_markup: employeeMenu() })
-      return
-    }
-    const submission = createSubmission(db, row.id, deps.now().toISOString(), state.photos)
-    setInstanceStatus(db, row.id, 'submitted')
-    clearState(db, ctx.from!.id)
-    await ctx.reply('Проверяю, это займёт до минуты.', { reply_markup: employeeMenu() })
-    deps.onSubmission(submission.id)
-  }
-
-  /** Отменяет сбор фото и удаляет уже загруженные файлы. */
-  async function cancelCollection(ctx: Context, state: CollectingState): Promise<void> {
-    for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
-    clearState(db, ctx.from!.id)
-    await ctx.reply('Отменено.', { reply_markup: employeeMenu() })
-  }
-
-  bot.hears(BTN.photosDone, async (ctx, next) => {
-    const state = collecting(deps, ctx.from!.id)
-    if (!state) return next()
-    await finishCollection(ctx, state)
-  })
-
-  bot.hears(BTN.cancel, async (ctx, next) => {
-    const state = collecting(deps, ctx.from!.id)
-    if (!state) return next()
-    await cancelCollection(ctx, state)
-  })
-
-  // Пока идёт сбор фото, любое постороннее сообщение не должно проваливаться в главное меню:
-  // оно снесло бы клавиатуру «Готово»/«Отмена». Обработчик фото зарегистрирован выше и
-  // при активном состоянии сам завершает обновление, поэтому сюда фото не доходят.
-  bot.on('message', async (ctx, next) => {
-    if (!ctx.from) return next()
-    const state = collecting(deps, ctx.from.id)
-    if (!state) return next()
-    if (ctx.message.photo) return next()
-    const text = ctx.message.text?.trim().toLowerCase()
-    if (text === BTN.photosDone.toLowerCase()) return finishCollection(ctx, state)
-    if (text === BTN.cancel.toLowerCase()) return cancelCollection(ctx, state)
-    await ctx.reply('Сейчас идёт отправка фото. Пришлите фото, затем нажмите Готово, или нажмите Отмена.', {
-      reply_markup: photoCollectKeyboard(),
-    })
+    return next()
   })
 }

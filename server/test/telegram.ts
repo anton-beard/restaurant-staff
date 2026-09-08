@@ -51,7 +51,7 @@ type Responder = (payload: Record<string, unknown>) => unknown
 let messageCounter = 100
 
 export function captureApi(
-  target: Api | Bot,
+  target: Api | Bot<any>,
   responders: Record<string, Responder> = {},
   calls: ApiCall[] = [],
 ): ApiCall[] {

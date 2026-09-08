@@ -5,6 +5,7 @@ import { normalizePhone } from '../lib/phone.js'
 import type { BotDeps } from './deps.js'
 import { BTN, contactRequest, employeeMenu, ownerMenu } from './keyboards.js'
 import { roleOf, summaryText } from './roles.js'
+import type { BotContext } from './states.js'
 
 export async function showHome(ctx: Context, deps: BotDeps): Promise<void> {
   if (!ctx.from) return
@@ -18,7 +19,7 @@ export async function showHome(ctx: Context, deps: BotDeps): Promise<void> {
   }
 }
 
-export function registerLinking(bot: Bot, deps: BotDeps): void {
+export function registerLinking(bot: Bot<BotContext>, deps: BotDeps): void {
   const { db } = deps
 
   bot.command('start', (ctx) => showHome(ctx, deps))
@@ -77,6 +78,6 @@ export function registerLinking(bot: Bot, deps: BotDeps): void {
   })
 }
 
-export function registerFallback(bot: Bot, deps: BotDeps): void {
+export function registerFallback(bot: Bot<BotContext>, deps: BotDeps): void {
   bot.on('message', (ctx) => showHome(ctx, deps))
 }
