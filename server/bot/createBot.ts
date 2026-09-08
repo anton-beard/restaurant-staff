@@ -4,6 +4,7 @@ import { normalizePhone } from '../lib/phone.js'
 import type { BotDeps } from './deps.js'
 import { registerLearning } from './learning.js'
 import { registerFallback, registerLinking } from './linking.js'
+import { registerQuiz, registerQuizStates } from './quiz.js'
 import { registerReview, registerReviewStates } from './review.js'
 import { registerContextMiddleware, type BotContext } from './states.js'
 import { registerTaskStates, registerTasks } from './tasks.js'
@@ -20,10 +21,12 @@ export function createBot(opts: BotOptions): Bot<BotContext> {
   registerContextMiddleware(bot, deps)
   registerTaskStates(bot, deps)
   registerReviewStates(bot, deps)
+  registerQuizStates(bot, deps)
   registerLinking(bot, deps)
   registerTasks(bot, deps)
   registerReview(bot, deps)
   registerLearning(bot, deps)
+  registerQuiz(bot, deps)
   registerFallback(bot, deps)
 
   bot.catch(async (err) => {
