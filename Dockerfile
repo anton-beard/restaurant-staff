@@ -8,6 +8,7 @@ RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim
 WORKDIR /app
+# tzdata не нужен: даты считаются через Intl с явным timeZone, ICU встроен в Node
 ENV NODE_ENV=production DATA_DIR=/data TZ=Europe/Moscow
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

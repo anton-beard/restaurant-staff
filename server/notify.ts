@@ -55,7 +55,8 @@ export function createTelegramNotifier(api: Api, db: Db): Notifier {
       try {
         await api.editMessageText(chatId, messageId, text)
         return true
-      } catch {
+      } catch (err) {
+        console.warn('editMessage failed', chatId, messageId, err)
         return false
       }
     },

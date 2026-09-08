@@ -2,7 +2,7 @@
 
 Telegram-бот для сотрудников и веб-админка для владельца. Один процесс: Fastify + grammY + SQLite.
 
-Дизайн: `docs/superpowers/specs/2026-09-07-restaurant-staff-design.md`.
+Дизайн: `docs/superpowers/specs/2026-09-07-restaurant-staff-design.md`, `docs/superpowers/specs/2026-09-08-stage2-tasks-design.md`.
 
 ## Требования
 

@@ -38,6 +38,7 @@ export function localParts(date: Date, tz: string): LocalParts {
  * Момент UTC для локального времени в зоне tz.
  * Если такого локального времени нет (весенний перевод часов), берём более поздний
  * из двух кандидатов, то есть сдвигаем вперёд: 02:30 в «дыре» становится 03:30.
+ * Если локальное время существует дважды (осенний перевод), возвращается более ранний момент.
  */
 export function zonedToUtc(p: { y: number; m: number; d: number; hh: number; mm: number }, tz: string): Date {
   const target = Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm)
