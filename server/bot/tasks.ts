@@ -64,9 +64,14 @@ async function finishCollection(ctx: BotContext, deps: BotDeps, state: Collectin
   deps.onSubmission(submission.id)
 }
 
+/** Удаляет файлы незавершённого сбора фото: сдачи не будет, хранить нечего. */
+export function discardCollection(deps: BotDeps, state: CollectingState): void {
+  for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
+}
+
 /** Отменяет сбор фото и удаляет уже загруженные файлы. */
 async function cancelCollection(ctx: BotContext, deps: BotDeps, state: CollectingState): Promise<void> {
-  for (const p of state.photos) rmSync(join(deps.uploadsDir, p.path), { force: true })
+  discardCollection(deps, state)
   clearState(deps.db, ctx.from!.id)
   await ctx.reply('Отменено.', { reply_markup: employeeMenu() })
 }

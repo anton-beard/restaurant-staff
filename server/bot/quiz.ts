@@ -3,7 +3,7 @@ import { clearState, setState } from '../db/botStates.js'
 import { getCourse } from '../db/courses.js'
 import { getQuiz, listQuestions } from '../db/quizzes.js'
 import {
-  completeCourseAssignment, createAttempt, finishAttempt, getAttempt, getCourseAssignment, getOpenAttempt, getQuizAssignmentRow,
+  abandonAttempt, completeCourseAssignment, createAttempt, finishAttempt, getAttempt, getCourseAssignment, getOpenAttempt, getQuizAssignmentRow,
   listEmployeeQuizAssignments, markQuizPassed, recordAnswer, type QuizAttempt, type QuizAssignmentRow,
 } from '../db/learningAssignments.js'
 import { formatLocal } from '../lib/time.js'
@@ -12,14 +12,28 @@ import { CB_RE } from './callbacks.js'
 import type { BotDeps } from './deps.js'
 import { answersKeyboard, BTN, employeeMenu, startQuizKeyboard } from './keyboards.js'
 import { showHome } from './linking.js'
+import { discardCollection } from './tasks.js'
 import { employeeOf, onState, type BotContext } from './states.js'
 
-export async function askQuestion(ctx: BotContext, deps: BotDeps, attempt: QuizAttempt): Promise<void> {
+/**
+ * Отправляет текущий вопрос попытки, при необходимости с предваряющим сообщением.
+ * Если вопроса больше нет (тест изменили на ходу), закрывает попытку без оценки, снимает состояние
+ * и предлагает начать заново — возвращает false, делать после этого нечего.
+ */
+export async function askQuestion(ctx: BotContext, deps: BotDeps, attempt: QuizAttempt, notice?: string): Promise<boolean> {
   const row = getQuizAssignmentRow(deps.db, attempt.assignment_id)!
   const questions = listQuestions(deps.db, row.quiz_id)
   const q = questions.find((x) => x.position === attempt.current_question)
-  if (!q) return
+  if (!q) {
+    abandonAttempt(deps.db, attempt.id, deps.now().toISOString())
+    clearState(deps.db, ctx.from!.id)
+    const canRestart = row.status === 'pending' || row.status === 'overdue'
+    await ctx.reply('Тест изменился, начните его заново.', { reply_markup: canRestart ? startQuizKeyboard(row.id) : employeeMenu() })
+    return false
+  }
+  if (notice) await ctx.reply(notice)
   await ctx.reply(`Вопрос ${q.position} из ${questions.length}:\n${q.text}`, { reply_markup: answersKeyboard(attempt.id, q.position, q.options) })
+  return true
 }
 
 export function registerQuizStates(bot: Bot<BotContext>, deps: BotDeps): void {
@@ -29,8 +43,14 @@ export function registerQuizStates(bot: Bot<BotContext>, deps: BotDeps): void {
       clearState(deps.db, ctx.from!.id)
       return next()
     }
-    await ctx.reply(`Идёт тест, ответьте на вопрос ${attempt.current_question}.`)
-    await askQuestion(ctx, deps, attempt)
+    // «Отмена» и /start откладывают тест: попытка остаётся открытой, меню снова доступно
+    const text = ctx.message.text?.trim().toLowerCase() ?? ''
+    if (text === BTN.cancel.toLowerCase() || text === '/start' || text.startsWith('/start ')) {
+      clearState(deps.db, ctx.from!.id)
+      await ctx.reply('Тест отложен. Продолжить можно через «Тесты».', { reply_markup: employeeMenu() })
+      return
+    }
+    await askQuestion(ctx, deps, attempt, `Идёт тест, ответьте на вопрос ${attempt.current_question}.`)
   })
 }
 
@@ -80,6 +100,8 @@ export function registerQuiz(bot: Bot<BotContext>, deps: BotDeps): void {
     if (!emp || !row || row.employee_id !== emp.id) return ctx.answerCallbackQuery({ text: 'Это не ваш тест.' })
     if (row.status === 'passed') return ctx.answerCallbackQuery({ text: 'Тест уже сдан.' })
     const attempt = getOpenAttempt(db, row.id) ?? createAttempt(db, row.id, deps.now().toISOString())
+    // из режима сбора фото уходим начисто: сдачи не будет, файлы осиротеют
+    if (ctx.state?.kind === 'collecting_photos') discardCollection(deps, ctx.state)
     setState(db, ctx.from.id, { kind: 'quiz', attempt_id: attempt.id })
     await ctx.answerCallbackQuery()
     await askQuestion(ctx, deps, attempt)
@@ -95,7 +117,10 @@ export function registerQuiz(bot: Bot<BotContext>, deps: BotDeps): void {
     await ctx.answerCallbackQuery()
     const fresh = getAttempt(db, attemptId)!
     const total = listQuestions(db, row.quiz_id).length
-    if (fresh.current_question <= total) return askQuestion(ctx, deps, fresh)
+    if (fresh.current_question <= total) {
+      await askQuestion(ctx, deps, fresh)
+      return
+    }
     await finish(ctx, fresh, row)
   })
 }

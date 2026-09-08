@@ -1,14 +1,18 @@
+import { existsSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Bot } from 'grammy'
 import { openDb, type Db } from '../db/connect.js'
 import { getState } from '../db/botStates.js'
 import { OWNER_TELEGRAM_ID, setSetting } from '../db/settings.js'
 import { publishCourse } from '../db/courses.js'
-import { createCourseAssignment, createQuizAssignment, getCourseAssignment, getQuizAssignment, listAttempts } from '../db/learningAssignments.js'
+import { createInstance } from '../db/taskInstances.js'
+import { createTaskTemplate } from '../db/taskTemplates.js'
+import { createCourseAssignment, createQuizAssignment, getAttempt, getCourseAssignment, getQuizAssignment, listAttempts } from '../db/learningAssignments.js'
 import { makeBot } from '../test/bot.js'
 import { seedRestaurant } from '../test/fixtures.js'
 import { seedCourse, seedQuiz } from '../test/learning.js'
-import { callbackUpdate, textUpdate, type ApiCall } from '../test/telegram.js'
+import { callbackUpdate, photoUpdate, textUpdate, type ApiCall } from '../test/telegram.js'
 import { CB } from './callbacks.js'
 import type { BotContext } from './states.js'
 
@@ -16,6 +20,7 @@ const NOW = '2026-09-07T10:00:00.000Z'
 let db: Db
 let bot: Bot<BotContext>
 let calls: ApiCall[]
+let uploadsDir: string
 let seed: ReturnType<typeof seedRestaurant>
 
 const texts = () => calls.filter((c) => c.method === 'sendMessage').map((c) => ({ to: c.payload.chat_id, text: String(c.payload.text), markup: JSON.stringify(c.payload.reply_markup ?? {}) }))
@@ -26,7 +31,12 @@ beforeEach(() => {
   db = openDb(':memory:')
   seed = seedRestaurant(db)
   setSetting(db, OWNER_TELEGRAM_ID, '42')
-  ;({ bot, calls } = makeBot(db, { now: () => new Date(NOW) }))
+  const made = makeBot(db, { now: () => new Date(NOW) }, {
+    getFile: (p) => ({ file_id: p.file_id, file_unique_id: 'x', file_path: `photos/${String(p.file_id)}.jpg` }),
+  })
+  bot = made.bot
+  calls = made.calls
+  uploadsDir = made.deps.uploadsDir
 })
 
 function standalone() {
@@ -94,6 +104,54 @@ describe('taking a quiz', () => {
     await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
     expect(lastText()).toContain('Вопрос 2 из 2')
     expect(listAttempts(db, a.id)).toHaveLength(1)
+  })
+
+  it('closes the attempt and offers a restart when the quiz changed mid-attempt', async () => {
+    const a = standalone()
+    await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
+    const attempt = listAttempts(db, a.id)[0]!
+    db.prepare('delete from questions where quiz_id = ?').run(getQuizAssignment(db, a.id)!.quiz_id)
+    await bot.handleUpdate(textUpdate(500, 'привет'))
+    expect(lastText()).toBe('Тест изменился, начните его заново.')
+    expect(texts().at(-1)?.markup).toContain(CB.quizStart(a.id))
+    expect(getState(db, 500)).toBeNull()
+    expect(getAttempt(db, attempt.id)).toMatchObject({ finished_at: NOW, score: null, passed: null })
+    // меню снова доступно
+    await bot.handleUpdate(textUpdate(500, '/start'))
+    expect(lastText()).toBe('Здравствуйте, Иван Петров!')
+  })
+
+  it('postpones the quiz on Отмена and on /start, keeping the attempt open', async () => {
+    const a = standalone()
+    await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
+    const attempt = listAttempts(db, a.id)[0]!
+    await bot.handleUpdate(textUpdate(500, ' оТмена '))
+    expect(lastText()).toBe('Тест отложен. Продолжить можно через «Тесты».')
+    expect(getState(db, 500)).toBeNull()
+    expect(getAttempt(db, attempt.id)?.finished_at).toBeNull()
+    await bot.handleUpdate(textUpdate(500, 'Тесты'))
+    expect(texts().at(-1)?.markup).toContain('Продолжить')
+    await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
+    await bot.handleUpdate(textUpdate(500, '/start'))
+    expect(lastText()).toBe('Тест отложен. Продолжить можно через «Тесты».')
+    expect(getState(db, 500)).toBeNull()
+    expect(listAttempts(db, a.id)).toHaveLength(1)
+  })
+
+  it('starting a quiz during photo collection discards the collected files', async () => {
+    const t = createTaskTemplate(db, {
+      title: 'Помыть кофемашину', description: '', requires_photo: true, photo_criteria: 'Чисто', auto_accept_threshold: 80,
+      assignee_mode: 'by_position', distribution: 'each', schedule: null, deadline_minutes: 60, position_ids: [seed.positions.barista.id], employee_ids: [],
+    }, null)
+    const inst = createInstance(db, { template_id: t.id, employee_id: seed.employees.ivan.id, slot_at: NOW, issued_at: NOW, due_at: '2026-09-07T18:00:00.000Z', status: 'pending' })!
+    await bot.handleUpdate(callbackUpdate(500, CB.photo(inst.id)))
+    await bot.handleUpdate(photoUpdate(500, 'f1', 'u1'))
+    const dir = join(uploadsDir, String(inst.id))
+    expect(readdirSync(dir)).toHaveLength(1)
+    const a = standalone()
+    await bot.handleUpdate(callbackUpdate(500, CB.quizStart(a.id)))
+    expect(!existsSync(dir) || readdirSync(dir).length === 0).toBe(true)
+    expect(getState<{ kind: string }>(db, 500)?.kind).toBe('quiz')
   })
 
   it('passing the course quiz completes the course and tells the owner', async () => {

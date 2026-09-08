@@ -210,6 +210,11 @@ export function finishAttempt(db: Db, id: number, score: number, passed: boolean
   db.prepare('update quiz_attempts set finished_at = ?, score = ?, passed = ? where id = ?').run(nowIso, score, passed ? 1 : 0, id)
 }
 
+/** Закрывает попытку без результата: тест изменили на ходу, оценивать нечего. */
+export function abandonAttempt(db: Db, id: number, nowIso: string): void {
+  db.prepare('update quiz_attempts set finished_at = ? where id = ?').run(nowIso, id)
+}
+
 export function listAttempts(db: Db, assignmentId: number): QuizAttempt[] {
   return (db.prepare(`select ${atCols} from quiz_attempts where assignment_id = ? order by id`).all(assignmentId) as AttemptRow[]).map(toAttempt)
 }
