@@ -23,7 +23,7 @@ Node.js ≥ 24 (для разработки), Docker и Docker Compose — дл�
 
 Cookie сессии в контейнере ставится только по HTTPS, поэтому на сервере приложение запускается за Caddy, который сам получает сертификат Let's Encrypt.
 
-1. Домен (или поддомен) с A-записью на IP сервера.
+1. Домен (или поддомен) с A-записью на IP сервера. Без домена подойдёт имя `1-2-3-4.sslip.io` (IP сервера через дефисы): sslip.io бесплатно резолвит его в этот IP, регистрация не нужна.
 2. В `.env` дополнительно `DOMAIN=staff.example.com` и `PUBLIC_URL=https://staff.example.com`.
 3. `docker compose -f docker-compose.prod.yml up -d --build` — порты 80 и 443 должны быть открыты.
 4. Обновление: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
