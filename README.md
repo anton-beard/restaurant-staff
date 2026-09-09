@@ -19,6 +19,15 @@ Node.js ≥ 24 (для разработки), Docker и Docker Compose — дл�
 
 Данные лежат в `./data` (база и загруженные файлы). Бэкап: копия этой папки после `docker compose down`.
 
+### На сервере с HTTPS
+
+Cookie сессии в контейнере ставится только по HTTPS, поэтому на сервере приложение запускается за Caddy, который сам получает сертификат Let's Encrypt.
+
+1. Домен (или поддомен) с A-записью на IP сервера.
+2. В `.env` дополнительно `DOMAIN=staff.example.com` и `PUBLIC_URL=https://staff.example.com`.
+3. `docker compose -f docker-compose.prod.yml up -d --build` — порты 80 и 443 должны быть открыты.
+4. Обновление: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+
 ## Что умеет
 
 - Сотрудники подключаются к боту по номеру телефона, владелец входит в админку по коду из бота.
