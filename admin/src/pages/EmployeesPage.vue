@@ -130,7 +130,7 @@ onMounted(load)
       </thead>
       <tbody class="divide-y">
         <tr v-for="e in employees" :key="e.id">
-          <td class="px-4 py-2">{{ e.full_name }}</td>
+          <td class="px-4 py-2"><RouterLink :to="`/employees/${e.id}`" class="underline">{{ e.full_name }}</RouterLink></td>
           <td class="px-4 py-2">{{ e.phone }}</td>
           <td class="px-4 py-2">{{ positionName(e.position_id) }}</td>
           <td class="px-4 py-2">{{ statusLabel[e.status] }}</td>

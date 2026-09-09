@@ -26,6 +26,7 @@ async function logout() {
     <header class="bg-white border-b">
       <nav class="max-w-5xl mx-auto px-4 py-2 flex flex-wrap items-center gap-6">
         <span class="font-semibold">Ресторан</span>
+        <RouterLink to="/" class="text-sm hover:underline" :class="{ 'font-semibold': $route.path === '/' }">Сводка</RouterLink>
         <RouterLink to="/tasks" class="text-sm hover:underline" active-class="font-semibold">Задания</RouterLink>
         <RouterLink to="/journal" class="text-sm hover:underline" active-class="font-semibold">Журнал</RouterLink>
         <RouterLink to="/review" class="text-sm hover:underline" active-class="font-semibold">
