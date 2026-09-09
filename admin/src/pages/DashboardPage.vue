@@ -5,16 +5,25 @@ import { api, errorText, type RatingDays, type RatingRow, type Summary } from '.
 const summary = ref<Summary | null>(null)
 const rows = ref<RatingRow[]>([])
 const days = ref<RatingDays>(30)
-const digestTime = ref('09:00')
+const digestTime = ref<string | null>(null)
+const digestLoaded = ref(false)
+const digestError = ref('')
 const error = ref('')
 const info = ref('')
 
 async function loadSummary() {
   try {
     summary.value = await api.stats.summary()
-    digestTime.value = (await api.settings.digest()).time
   } catch (err) {
     error.value = errorText(err)
+  }
+}
+async function loadDigest() {
+  try {
+    digestTime.value = (await api.settings.digest()).time
+    digestLoaded.value = true
+  } catch (err) {
+    digestError.value = errorText(err)
   }
 }
 async function loadRating() {
@@ -25,19 +34,20 @@ async function loadRating() {
   }
 }
 async function saveDigest() {
-  error.value = ''
+  digestError.value = ''
   info.value = ''
   try {
-    await api.settings.setDigest(digestTime.value)
+    await api.settings.setDigest(digestTime.value!)
     info.value = `Недельная сводка будет приходить по понедельникам в ${digestTime.value}.`
   } catch (err) {
-    error.value = errorText(err, { validation: 'Время в формате ЧЧ:ММ.' })
+    digestError.value = errorText(err, { validation: 'Время в формате ЧЧ:ММ.' })
   }
 }
 const pct = (share: number | null) => (share === null ? '—' : `${Math.round(share * 100)}%`)
 
 onMounted(() => {
   void loadSummary()
+  void loadDigest()
   void loadRating()
 })
 watch(days, loadRating)
@@ -51,13 +61,21 @@ watch(days, loadRating)
     <div v-if="summary" class="grid gap-4 md:grid-cols-4 text-sm">
       <div class="bg-white rounded-xl shadow p-4">
         <div class="text-gray-500">Сегодня</div>
-        <div class="text-2xl font-semibold">{{ summary.today.onTime }} <span class="text-base font-normal text-gray-500">в срок из {{ summary.today.issued }} выданных</span></div>
-        <div :class="summary.today.overdue ? 'text-red-700' : 'text-gray-500'">Просрочено: {{ summary.today.overdue }}, поздно: {{ summary.today.late }}</div>
+        <div class="grid grid-cols-2 gap-1 mt-1">
+          <div>Выдано <span class="font-semibold">{{ summary.today.issued }}</span></div>
+          <div>В срок <span class="font-semibold">{{ summary.today.onTime }}</span></div>
+          <div :class="summary.today.late ? 'text-red-700' : ''">Поздно <span class="font-semibold">{{ summary.today.late }}</span></div>
+          <div :class="summary.today.overdue ? 'text-red-700' : ''">Просрочено <span class="font-semibold">{{ summary.today.overdue }}</span></div>
+        </div>
       </div>
       <div class="bg-white rounded-xl shadow p-4">
         <div class="text-gray-500">7 дней</div>
-        <div class="text-2xl font-semibold">{{ summary.week.onTime }} <span class="text-base font-normal text-gray-500">в срок из {{ summary.week.issued }}</span></div>
-        <div :class="summary.week.overdue ? 'text-red-700' : 'text-gray-500'">Просрочено: {{ summary.week.overdue }}, поздно: {{ summary.week.late }}</div>
+        <div class="grid grid-cols-2 gap-1 mt-1">
+          <div>Выдано <span class="font-semibold">{{ summary.week.issued }}</span></div>
+          <div>В срок <span class="font-semibold">{{ summary.week.onTime }}</span></div>
+          <div :class="summary.week.late ? 'text-red-700' : ''">Поздно <span class="font-semibold">{{ summary.week.late }}</span></div>
+          <div :class="summary.week.overdue ? 'text-red-700' : ''">Просрочено <span class="font-semibold">{{ summary.week.overdue }}</span></div>
+        </div>
       </div>
       <RouterLink to="/review" class="bg-white rounded-xl shadow p-4 hover:bg-gray-50">
         <div class="text-gray-500">Ждёт проверки</div>
@@ -100,11 +118,12 @@ watch(days, loadRating)
 
     <section class="bg-white rounded-xl shadow p-4 text-sm space-y-2 max-w-md">
       <div class="font-medium">Недельная сводка в боте</div>
-      <form class="flex gap-2 items-center" @submit.prevent="saveDigest">
+      <form v-if="digestLoaded" class="flex gap-2 items-center" @submit.prevent="saveDigest">
         <span>По понедельникам в</span>
         <input v-model="digestTime" type="time" class="input max-w-32" required />
         <button class="btn">Сохранить</button>
       </form>
+      <p v-else-if="digestError" class="text-red-600">{{ digestError }}</p>
       <p v-if="info" class="text-green-700">{{ info }}</p>
     </section>
   </div>
