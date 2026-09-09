@@ -61,4 +61,25 @@ describe('weeklyDigest', () => {
     expect(await weeklyDigest(deps, new Date('2026-09-14T06:30:00.000Z'))).toBe(false) // 09:30 < 12:00
     expect(await weeklyDigest(deps, new Date('2026-09-14T09:30:00.000Z'))).toBe(true)
   })
+
+  it('marks the day as attempted even when the send fails, and never retries the same Monday', async () => {
+    setSetting(db, OWNER_TELEGRAM_ID, '42')
+    let calls = 0
+    const failingDeps: SchedulerDeps = {
+      ...deps,
+      notifier: {
+        ...deps.notifier,
+        toOwner: async (text) => {
+          calls++
+          log.push({ to: 'owner', text })
+          return null
+        },
+      },
+    }
+    expect(await weeklyDigest(failingDeps, MONDAY)).toBe(false)
+    expect(calls).toBe(1)
+    expect(getSetting(db, WEEKLY_DIGEST_SENT_FOR)).toBe('2026-09-07')
+    expect(await weeklyDigest(failingDeps, new Date('2026-09-07T07:00:00.000Z'))).toBe(false)
+    expect(calls).toBe(1)
+  })
 })
