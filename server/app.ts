@@ -19,6 +19,7 @@ import { employeeRoutes } from './api/employees.js'
 import { taskRoutes } from './api/tasks.js'
 import { learningRoutes } from './api/learning.js'
 import { uploadRoutes } from './api/uploads.js'
+import { statsRoutes } from './api/stats.js'
 
 export type AppDeps = {
   config: Config
@@ -68,6 +69,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     scope.register(taskRoutes, { db, notifier, tz: config.TZ })
     scope.register(learningRoutes, { db, notifier, tz: config.TZ, uploadsDir: deps.uploadsDir })
     scope.register(uploadRoutes, { uploadsDir: deps.uploadsDir })
+    scope.register(statsRoutes, { db, tz: config.TZ })
   })
 
   const notFound = (_req: FastifyRequest, reply: FastifyReply) =>
