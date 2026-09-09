@@ -1,8 +1,7 @@
 import type { Db } from '../db/connect.js'
-import { localParts } from '../lib/time.js'
+import { localParts, two } from '../lib/time.js'
 import { periodDaysBack, quizMetrics, rating, taskMetrics } from './metrics.js'
 
-const two = (n: number) => String(n).padStart(2, '0')
 const ddmm = (d: Date, tz: string) => {
   const p = localParts(d, tz)
   return `${two(p.d)}.${two(p.m)}`

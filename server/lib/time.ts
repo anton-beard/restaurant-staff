@@ -61,7 +61,7 @@ export function addDays(p: { y: number; m: number; d: number }, n: number): { y:
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() }
 }
 
-const two = (n: number) => String(n).padStart(2, '0')
+export const two = (n: number) => String(n).padStart(2, '0')
 
 export function formatLocal(date: Date, tz: string, now: Date): string {
   const p = localParts(date, tz)
