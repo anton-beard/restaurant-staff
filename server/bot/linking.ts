@@ -11,7 +11,7 @@ export async function showHome(ctx: Context, deps: BotDeps): Promise<void> {
   if (!ctx.from) return
   const role = roleOf(deps.db, ctx.from.id)
   if (role.kind === 'owner') {
-    await ctx.reply(`Вы владелец.\n${summaryText(deps.db, deps.publicUrl, deps.now())}`, { reply_markup: ownerMenu() })
+    await ctx.reply(`Вы владелец.\n${summaryText(deps.db, deps.publicUrl, deps.now(), deps.tz)}`, { reply_markup: ownerMenu() })
   } else if (role.kind === 'employee') {
     await ctx.reply(`Здравствуйте, ${role.employee.full_name}!`, { reply_markup: employeeMenu() })
   } else {
@@ -42,7 +42,7 @@ export function registerLinking(bot: Bot<BotContext>, deps: BotDeps): void {
         console.warn(`owner telegram id changed from ${previous} to ${fromId}`)
       }
       setSetting(db, OWNER_TELEGRAM_ID, String(fromId))
-      await ctx.reply(`Вы вошли как владелец.\n${summaryText(db, deps.publicUrl, deps.now())}`, { reply_markup: ownerMenu() })
+      await ctx.reply(`Вы вошли как владелец.\n${summaryText(db, deps.publicUrl, deps.now(), deps.tz)}`, { reply_markup: ownerMenu() })
       return
     }
     const employee = findEmployeeByPhone(db, phone)
@@ -65,16 +65,10 @@ export function registerLinking(bot: Bot<BotContext>, deps: BotDeps): void {
     await deps.notifier.toOwner(`Сотрудник ${linked.full_name} подключился к боту.`)
   })
 
-  bot.hears(BTN.rating, async (ctx) => {
-    if (!ctx.from) return
-    if (roleOf(db, ctx.from.id).kind !== 'employee') return showHome(ctx, deps)
-    await ctx.reply('Раздел появится в ближайшем обновлении.')
-  })
-
   bot.hears(BTN.summary, async (ctx) => {
     if (!ctx.from) return
     if (roleOf(db, ctx.from.id).kind !== 'owner') return showHome(ctx, deps)
-    await ctx.reply(summaryText(db, deps.publicUrl, deps.now()), { reply_markup: ownerMenu() })
+    await ctx.reply(summaryText(db, deps.publicUrl, deps.now(), deps.tz), { reply_markup: ownerMenu() })
   })
 }
 

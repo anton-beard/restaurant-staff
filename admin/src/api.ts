@@ -116,6 +116,16 @@ export type QuizAssignmentRow = {
 }
 export type QuizAttempt = { id: number; started_at: string; finished_at: string | null; current_question: number; answers: number[]; score: number | null; passed: boolean | null }
 
+export type TaskMetrics = { total: number; onTime: number; late: number; overdue: number; onTimeShare: number | null }
+export type QuizMetrics = { attempts: number; avgScore: number | null; passed: number; failed: number }
+export type EmployeeMetrics = { tasks: TaskMetrics; quiz: QuizMetrics; score: number | null }
+export type RatingRow = EmployeeMetrics & { employee_id: number; full_name: string; position_name: string; place: number | null }
+export type PeriodStats = { issued: number; onTime: number; late: number; overdue: number; quizzesPassed: number; quizzesFailed: number }
+export type Summary = { today: PeriodStats; week: PeriodStats; queue: { awaitingAi: number; awaitingOwner: number }; learning: { coursesInProgress: number; coursesOverdue: number } }
+export type TaskHistoryRow = { id: number; title: string; due_at: string; status: InstanceStatus; completed_at: string | null; last_score: number | null }
+export type EmployeeCard = { employee: Employee; position_name: string; metrics: EmployeeMetrics; tasks: TaskHistoryRow[]; courses: CourseAssignmentRow[]; quizzes: (QuizAssignmentRow & { attempts: QuizAttempt[] })[] }
+export type RatingDays = 7 | 30 | 90
+
 function qs(params: Record<string, string | number | undefined>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
   return entries.length ? '?' + entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : ''
@@ -192,6 +202,15 @@ export const api = {
       })
       return request<{ path: string }>('POST', '/api/learning/upload', { mime: file.type, data })
     },
+  },
+  stats: {
+    summary: () => request<Summary>('GET', '/api/stats/summary'),
+    rating: (days: RatingDays) => request<RatingRow[]>('GET', `/api/stats/rating?days=${days}`),
+    employee: (id: number, days: RatingDays) => request<EmployeeCard>('GET', `/api/stats/employees/${id}?days=${days}`),
+  },
+  settings: {
+    digest: () => request<{ time: string }>('GET', '/api/settings/digest'),
+    setDigest: (time: string) => request<{ time: string }>('PUT', '/api/settings/digest', { time }),
   },
 }
 

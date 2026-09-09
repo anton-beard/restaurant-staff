@@ -2,6 +2,7 @@ import type { Db } from '../db/connect.js'
 import type { Notifier } from '../notify.js'
 import type { ReviewQueue } from '../tasks/reviewQueue.js'
 import { cleanup } from './cleanup.js'
+import { weeklyDigest } from './digest.js'
 import { issueDueTemplates } from './issueDue.js'
 import { assignCourses, issueDueQuizzes, learningOverdue, learningReminders } from './learning.js'
 import { markOverdue } from './overdue.js'
@@ -46,6 +47,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       await step('issueDueQuizzes', () => issueDueQuizzes(deps, t))
       await step('learningReminders', () => learningReminders(deps, t))
       await step('learningOverdue', () => learningOverdue(deps, t))
+      await step('weeklyDigest', () => weeklyDigest(deps, t))
       if (t.getTime() - lastCleanup >= CLEANUP_INTERVAL_MS) {
         lastCleanup = t.getTime()
         await step('cleanup', () => cleanup(deps, t))

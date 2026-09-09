@@ -5,6 +5,7 @@ import type { BotDeps } from './deps.js'
 import { registerLearning } from './learning.js'
 import { registerFallback, registerLinking } from './linking.js'
 import { registerQuiz, registerQuizStates } from './quiz.js'
+import { registerRating } from './rating.js'
 import { registerReview, registerReviewStates } from './review.js'
 import { registerContextMiddleware, type BotContext } from './states.js'
 import { registerTaskStates, registerTasks } from './tasks.js'
@@ -27,6 +28,7 @@ export function createBot(opts: BotOptions): Bot<BotContext> {
   registerReview(bot, deps)
   registerLearning(bot, deps)
   registerQuiz(bot, deps)
+  registerRating(bot, deps)
   registerFallback(bot, deps)
 
   bot.catch(async (err) => {

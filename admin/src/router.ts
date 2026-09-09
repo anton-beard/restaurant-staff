@@ -13,6 +13,8 @@ import CourseForm from './pages/CourseForm.vue'
 import QuizzesPage from './pages/QuizzesPage.vue'
 import QuizForm from './pages/QuizForm.vue'
 import ProgressPage from './pages/ProgressPage.vue'
+import DashboardPage from './pages/DashboardPage.vue'
+import EmployeePage from './pages/EmployeePage.vue'
 
 let authed = false
 export function setAuthed(value: boolean) {
@@ -27,13 +29,14 @@ export const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
-        { path: '', redirect: '/tasks' },
+        { path: '', component: DashboardPage },
         { path: 'tasks', component: TemplatesPage },
         { path: 'tasks/new', component: TemplateForm },
         { path: 'tasks/:id/edit', component: TemplateForm, props: true },
         { path: 'journal', component: InstancesPage },
         { path: 'review', component: ReviewPage },
         { path: 'employees', component: EmployeesPage },
+        { path: 'employees/:id', component: EmployeePage, props: true },
         { path: 'positions', component: PositionsPage },
         { path: 'learning/courses', component: CoursesPage },
         { path: 'learning/courses/new', component: CourseForm },
