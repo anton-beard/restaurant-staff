@@ -81,7 +81,7 @@ export function rating(db: Db, period: Period): RatingRow[] {
   rows.forEach((r, i) => {
     if (r.score === null) return
     const prev = rows[i - 1]
-    if (!prev || prev.score !== r.score || (prev.tasks.onTimeShare ?? -1) !== (r.tasks.onTimeShare ?? -1)) place = i + 1
+    if (!prev || prev.score !== r.score) place = i + 1
     r.place = place
   })
   return rows

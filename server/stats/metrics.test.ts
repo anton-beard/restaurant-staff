@@ -97,6 +97,24 @@ describe('rating', () => {
     expect(m).toMatchObject({ score: 0, tasks: { overdue: 1 }, quiz: { attempts: 0 } })
   })
 
+  it('shares a place between employees tied on score from different metrics (quiz-only vs tasks-only)', () => {
+    const { ivan, anna } = seed.employees
+    for (let i = 0; i < 7; i++) instance(ivan.id, `2026-08-1${i}T12:00:00.000Z`, 'accepted', `2026-08-1${i}T12:00:00.000Z`)
+    for (let i = 0; i < 3; i++) instance(ivan.id, `2026-08-2${i}T12:00:00.000Z`, 'accepted', `2026-08-2${i}T13:00:00.000Z`)
+    expect(taskMetrics(db, ivan.id, P)).toMatchObject({ total: 10, onTime: 7, onTimeShare: 0.7 })
+    const quiz = seedQuiz(db, [seed.positions.barista.id])
+    const a1 = createQuizAssignment(db, { quiz_id: quiz.id, employee_id: anna.id, course_assignment_id: null, slot_at: '2026-09-01T07:00:00.000Z', assigned_at: '2026-09-01T07:00:00.000Z', due_at: '2026-09-01T15:00:00.000Z' })!
+    const t1 = createAttempt(db, a1.id, '2026-09-01T08:00:00.000Z')
+    finishAttempt(db, t1.id, 70, false, '2026-09-01T08:10:00.000Z')
+    const rows = rating(db, P)
+    const ivanRow = rows.find((r) => r.employee_id === ivan.id)!
+    const annaRow = rows.find((r) => r.employee_id === anna.id)!
+    expect(ivanRow.score).toBe(70)
+    expect(annaRow.score).toBe(70)
+    expect(ivanRow.place).toBe(1)
+    expect(annaRow.place).toBe(1)
+  })
+
   it('lists employees without data at the end without a place', () => {
     const rows = rating(db, P)
     expect(rows.every((r) => r.score === null && r.place === null)).toBe(true)
