@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, formatLocal, localParts, zonedToUtc } from './time.js'
+import { addDays, formatLocal, localMidnight, localParts, ymdLocal, zonedToUtc } from './time.js'
 
 const MSK = 'Europe/Moscow'
 
@@ -36,5 +36,13 @@ describe('time', () => {
     const now = new Date('2026-09-07T08:00:00Z')
     expect(formatLocal(new Date('2026-09-07T19:00:00Z'), MSK, now)).toBe('22:00')
     expect(formatLocal(new Date('2026-09-08T06:05:00Z'), MSK, now)).toBe('08.09 09:05')
+  })
+
+  it('localMidnight and ymdLocal use the zone', () => {
+    // 22:30Z 7 сентября = 01:30 8 сентября по Москве
+    const t = new Date('2026-09-07T22:30:00Z')
+    expect(localMidnight(t, MSK).toISOString()).toBe('2026-09-07T21:00:00.000Z')
+    expect(ymdLocal(t, MSK)).toBe('2026-09-08')
+    expect(ymdLocal(t, 'UTC')).toBe('2026-09-07')
   })
 })

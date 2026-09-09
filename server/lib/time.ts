@@ -70,3 +70,13 @@ export function formatLocal(date: Date, tz: string, now: Date): string {
   if (p.y === n.y && p.m === n.m && p.d === n.d) return time
   return `${two(p.d)}.${two(p.m)} ${time}`
 }
+
+export function localMidnight(now: Date, tz: string): Date {
+  const p = localParts(now, tz)
+  return zonedToUtc({ y: p.y, m: p.m, d: p.d, hh: 0, mm: 0 }, tz)
+}
+
+export function ymdLocal(date: Date, tz: string): string {
+  const p = localParts(date, tz)
+  return `${p.y}-${two(p.m)}-${two(p.d)}`
+}

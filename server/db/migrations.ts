@@ -223,4 +223,14 @@ export const migrations: Migration[] = [
       create index quiz_attempts_open on quiz_attempts(assignment_id) where finished_at is null;
     `,
   },
+  {
+    name: '004_stats',
+    sql: `
+      create index task_instances_employee_due on task_instances(employee_id, due_at);
+      create index task_instances_issued on task_instances(issued_at);
+      create index quiz_attempts_assignment_finished on quiz_attempts(assignment_id, finished_at);
+      create index course_assignments_employee on course_assignments(employee_id);
+      create index quiz_assignments_employee on quiz_assignments(employee_id);
+    `,
+  },
 ]
