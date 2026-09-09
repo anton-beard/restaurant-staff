@@ -8,15 +8,18 @@ import { employeeOf, type BotContext } from './states.js'
 
 export function ratingText(db: Db, employeeId: number, now: Date): string {
   const period = periodDaysBack(now, 30)
-  const m = employeeMetrics(db, employeeId, period)
+  const rows = rating(db, period)
+  const me = rows.find((r) => r.employee_id === employeeId)
+  // Архивный, но привязанный к записям сотрудник не входит в rating() —
+  // считаем его метрики отдельно, чтобы числа выше не пропадали.
+  const m = me ?? employeeMetrics(db, employeeId, period)
   const lines = ['За 30 дней']
   lines.push(m.score === null ? 'Пока нет данных для рейтинга.' : `Балл: ${m.score}`)
   lines.push(m.tasks.total === 0 ? 'Заданий пока не было.' : `Заданий в срок: ${m.tasks.onTime} из ${m.tasks.total}`)
   lines.push(m.quiz.attempts === 0 ? 'Тестов пока не было.' : `Тесты: средний балл ${m.quiz.avgScore}`)
   if (m.score !== null) {
-    const rows = rating(db, period).filter((r) => r.score !== null)
-    const me = rows.find((r) => r.employee_id === employeeId)
-    if (me?.place) lines.push(`Место: ${me.place} из ${rows.length}`)
+    if (!me) lines.push('Вы не участвуете в рейтинге.')
+    else lines.push(`Место: ${me.place} из ${rows.filter((r) => r.score !== null).length}`)
   }
   return lines.join('\n')
 }
