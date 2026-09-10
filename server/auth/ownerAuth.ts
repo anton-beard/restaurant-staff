@@ -7,7 +7,7 @@ const ATTEMPT_WINDOW_MS = 10 * 60_000
 const MAX_ATTEMPTS = 5
 const LOCK_MS = 15 * 60_000
 /** Shortest gap between two issued login codes. */
-export const CODE_MIN_INTERVAL_MS = 60_000
+export const CODE_MIN_INTERVAL_MS = 15_000
 /** How many codes may be issued within one hour. */
 export const CODE_MAX_PER_HOUR = 5
 const CODE_WINDOW_MS = 60 * 60_000

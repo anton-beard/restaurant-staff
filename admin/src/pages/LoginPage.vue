@@ -19,7 +19,7 @@ async function requestCode() {
   } catch (err) {
     error.value = errorText(err, {
       owner_not_linked: 'Владелец ещё не подключён: напишите боту /start и поделитесь номером.',
-      locked: 'Код запрашивали недавно. Подождите минуту и попробуйте снова.',
+      locked: 'Код запрашивали недавно. Подождите 15 секунд и попробуйте снова.',
     })
   } finally {
     busy.value = false

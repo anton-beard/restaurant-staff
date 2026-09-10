@@ -41,7 +41,7 @@ describe('login code', () => {
     expect(auth.verifyLoginCode(second)).toHaveProperty('token')
   })
 
-  it('refuses a second code within a minute', () => {
+  it('refuses a second code within 15 seconds', () => {
     expect(auth.createLoginCode()).toMatch(/^\d{6}$/)
     expect(auth.createLoginCode()).toBe('locked')
     clock += CODE_MIN_INTERVAL_MS
