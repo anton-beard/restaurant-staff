@@ -53,13 +53,13 @@ watch(filters, load, { deep: true })
   <div class="space-y-4">
     <h1 class="text-xl font-semibold">Прогресс обучения</h1>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       <button class="btn-secondary" :class="{ 'bg-gray-900 text-white': tab === 'courses' }" @click="tab = 'courses'">Курсы</button>
       <button class="btn-secondary" :class="{ 'bg-gray-900 text-white': tab === 'quizzes' }" @click="tab = 'quizzes'">Тесты</button>
-      <select v-model="filters.employee_id" class="input max-w-56"><option value="">Все сотрудники</option><option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option></select>
-      <select v-if="tab === 'courses'" v-model="filters.course_id" class="input max-w-64"><option value="">Все курсы</option><option v-for="c in courses" :key="c.id" :value="c.id">{{ c.title }}</option></select>
-      <select v-else v-model="filters.quiz_id" class="input max-w-64"><option value="">Все тесты</option><option v-for="q in quizzes" :key="q.id" :value="q.id">{{ q.title }}</option></select>
-      <select v-model="filters.status" class="input max-w-56">
+      <select v-model="filters.employee_id" class="input sm:max-w-56"><option value="">Все сотрудники</option><option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option></select>
+      <select v-if="tab === 'courses'" v-model="filters.course_id" class="input sm:max-w-64"><option value="">Все курсы</option><option v-for="c in courses" :key="c.id" :value="c.id">{{ c.title }}</option></select>
+      <select v-else v-model="filters.quiz_id" class="input sm:max-w-64"><option value="">Все тесты</option><option v-for="q in quizzes" :key="q.id" :value="q.id">{{ q.title }}</option></select>
+      <select v-model="filters.status" class="input sm:max-w-56">
         <option value="">Все статусы</option>
         <template v-if="tab === 'courses'">
           <option v-for="(label, key) in COURSE_STATUS" :key="key" :value="key">{{ label }}</option>
@@ -70,7 +70,7 @@ watch(filters, load, { deep: true })
       </select>
     </div>
 
-    <table v-if="tab === 'courses'" class="w-full bg-white rounded-xl shadow text-sm">
+    <div v-if="tab === 'courses'" class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Курс</th><th class="px-4 py-2">Сотрудник</th><th class="px-4 py-2">Урок</th><th class="px-4 py-2">Срок</th><th class="px-4 py-2">Статус</th></tr></thead>
       <tbody class="divide-y">
         <tr v-for="r in courseRows" :key="r.id" :class="{ 'text-red-700': r.status === 'overdue' }">
@@ -80,9 +80,9 @@ watch(filters, load, { deep: true })
         </tr>
         <tr v-if="courseRows.length === 0"><td colspan="5" class="px-4 py-3 text-gray-500">Ничего не найдено</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
-    <table v-else class="w-full bg-white rounded-xl shadow text-sm">
+    <div v-else class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Тест</th><th class="px-4 py-2">Сотрудник</th><th class="px-4 py-2">Срок</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr></thead>
       <tbody class="divide-y">
         <template v-for="r in quizRows" :key="r.id">
@@ -100,6 +100,6 @@ watch(filters, load, { deep: true })
         </template>
         <tr v-if="quizRows.length === 0"><td colspan="5" class="px-4 py-3 text-gray-500">Ничего не найдено</td></tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 </template>

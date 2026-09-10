@@ -84,7 +84,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
       <div class="flex flex-wrap gap-3 text-sm">
         <label v-for="p in positions" :key="p.id" class="flex items-center gap-1"><input v-model="form.position_ids" type="checkbox" :value="p.id" /> {{ p.name }}</label>
       </div>
-      <div class="flex gap-4 text-sm">
+      <div class="flex flex-wrap gap-4 text-sm">
         <label>Срок, дней<input v-model.number="form.due_days" type="number" min="1" max="365" class="input mt-1 max-w-32" required /></label>
         <label>Проходной балл<input v-model.number="form.pass_score" type="number" min="0" max="100" class="input mt-1 max-w-32" required /></label>
       </div>
@@ -93,12 +93,14 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
     <section class="bg-white rounded-xl shadow p-4 space-y-4">
       <div class="text-sm font-medium">Уроки</div>
       <div v-for="(l, i) in form.lessons" :key="l.key" class="border rounded-lg p-3 space-y-2">
-        <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center">
           <span class="text-sm text-gray-500 w-6">{{ i + 1 }}.</span>
-          <input v-model="l.title" class="input" placeholder="Заголовок урока" required />
-          <button type="button" class="btn-secondary" @click="move(i, -1)">↑</button>
-          <button type="button" class="btn-secondary" @click="move(i, 1)">↓</button>
-          <button type="button" class="btn-secondary" @click="removeLesson(i)">Убрать</button>
+          <input v-model="l.title" class="input flex-1 min-w-48" placeholder="Заголовок урока" required />
+          <div class="flex gap-2 ml-auto">
+            <button type="button" class="btn-secondary" @click="move(i, -1)">↑</button>
+            <button type="button" class="btn-secondary" @click="move(i, 1)">↓</button>
+            <button type="button" class="btn-secondary" @click="removeLesson(i)">Убрать</button>
+          </div>
         </div>
         <textarea v-model="l.body" class="input" rows="4" placeholder="Текст урока" />
         <div class="flex flex-wrap gap-2 items-center text-sm">
@@ -112,7 +114,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
         </div>
         <div class="flex flex-wrap gap-2 items-center text-sm">
           <label class="btn-secondary cursor-pointer">Добавить картинку<input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="addImage(i, $event)" /></label>
-          <input v-model="videoDraft[l.key]" class="input max-w-72" placeholder="Ссылка на видео (YouTube и т.п.)" />
+          <input v-model="videoDraft[l.key]" class="input sm:max-w-72" placeholder="Ссылка на видео (YouTube и т.п.)" />
           <button type="button" class="btn-secondary" @click="addVideo(l)">Добавить видео</button>
         </div>
       </div>

@@ -46,7 +46,7 @@ onMounted(load)
     <section v-for="row in queue" :key="row.id" class="bg-white rounded-xl shadow p-4 grid gap-4 md:grid-cols-2">
       <div class="space-y-2">
         <img :src="`/api/uploads/${row.photos[big[row.id] ?? 0]?.path}`" class="w-full rounded-lg object-contain max-h-96 bg-gray-100" />
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <img v-for="(p, i) in row.photos" :key="p.id" :src="`/api/uploads/${p.path}`" class="h-16 rounded cursor-pointer border-2"
             :class="(big[row.id] ?? 0) === i ? 'border-gray-900' : 'border-transparent'" @click="big[row.id] = i" />
         </div>

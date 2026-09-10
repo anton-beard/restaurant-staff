@@ -2,12 +2,36 @@
 
 @layer components {
   .btn {
-    @apply rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50;
+    @apply rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap;
   }
   .btn-secondary {
-    @apply rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50;
+    @apply rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap;
   }
   .input {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400;
+    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 min-w-0;
+  }
+  /* Таблица в карточке; на узком экране прокручивается по горизонтали, заголовки не переносятся. */
+  .table-wrap {
+    @apply bg-white rounded-xl shadow overflow-x-auto;
+  }
+  .table-wrap th {
+    @apply whitespace-nowrap;
+  }
+  /* Горизонтальное меню без видимой полосы прокрутки. */
+  .nav-scroll {
+    @apply overflow-x-auto whitespace-nowrap;
+    scrollbar-width: none;
+  }
+  .nav-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* На телефоне ячейки компактнее. */
+@media (max-width: 640px) {
+  .table-wrap th,
+  .table-wrap td {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
   }
 }

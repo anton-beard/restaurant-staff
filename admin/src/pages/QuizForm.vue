@@ -58,13 +58,13 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
       <div class="flex flex-wrap gap-3 text-sm">
         <label v-for="p in positions" :key="p.id" class="flex items-center gap-1"><input v-model="form.position_ids" type="checkbox" :value="p.id" /> {{ p.name }}</label>
       </div>
-      <div class="flex gap-4 text-sm">
+      <div class="flex flex-wrap gap-4 text-sm">
         <label>Проходной балл<input v-model.number="form.pass_score" type="number" min="0" max="100" class="input mt-1 max-w-32" required /></label>
         <label>Срок на прохождение, минут<input v-model.number="form.deadline_minutes" type="number" min="15" class="input mt-1 max-w-32" required /></label>
       </div>
       <label class="flex items-center gap-2 text-sm"><input v-model="form.scheduled" type="checkbox" /> Выдавать по расписанию</label>
       <template v-if="form.scheduled">
-        <div class="flex gap-1">
+        <div class="flex flex-wrap gap-1">
           <button v-for="(label, i) in DAY_LABELS" :key="i" type="button" class="btn-secondary" :class="{ 'bg-gray-900 text-white': form.days.includes(i + 1) }" @click="toggleDay(i + 1)">{{ label }}</button>
         </div>
         <div class="space-y-2">

@@ -125,7 +125,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
 
     <section class="bg-white rounded-xl shadow p-4 space-y-3">
       <div class="text-sm font-medium">Кому</div>
-      <div class="flex gap-4 text-sm">
+      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <label class="flex items-center gap-1"><input v-model="form.assignee_mode" type="radio" value="by_position" /> По должностям</label>
         <label class="flex items-center gap-1"><input v-model="form.assignee_mode" type="radio" value="by_employees" /> Поимённо</label>
       </div>
@@ -139,7 +139,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
           <input v-model="form.employee_ids" type="checkbox" :value="e.id" /> {{ e.full_name }}
         </label>
       </div>
-      <div class="flex gap-4 text-sm pt-2">
+      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm pt-2">
         <label class="flex items-center gap-1"><input v-model="form.distribution" type="radio" value="each" /> Каждому своя копия</label>
         <label class="flex items-center gap-1"><input v-model="form.distribution" type="radio" value="shared" /> Одно на всех, берёт первый</label>
       </div>
@@ -147,13 +147,13 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
 
     <section class="bg-white rounded-xl shadow p-4 space-y-3">
       <div class="text-sm font-medium">Когда</div>
-      <div class="flex gap-4 text-sm">
+      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <label class="flex items-center gap-1"><input v-model="form.schedule_kind" type="radio" value="once" /> Разовое, сейчас</label>
         <label class="flex items-center gap-1"><input v-model="form.schedule_kind" type="radio" value="weekly" /> По дням недели</label>
         <label class="flex items-center gap-1"><input v-model="form.schedule_kind" type="radio" value="interval" /> Каждые N часов</label>
       </div>
       <template v-if="form.schedule_kind !== 'once'">
-        <div class="flex gap-1">
+        <div class="flex flex-wrap gap-1">
           <button v-for="(label, i) in DAY_LABELS" :key="i" type="button" class="btn-secondary"
             :class="{ 'bg-gray-900 text-white': form.days.includes(i + 1) }" @click="toggleDay(i + 1)">{{ label }}</button>
         </div>
@@ -172,7 +172,7 @@ onMounted(() => load().catch((err) => (error.value = errorText(err))))
       </template>
       <label class="block text-sm">
         Срок выполнения, минут
-        <div class="flex gap-2 items-center mt-1">
+        <div class="flex flex-wrap gap-2 items-center mt-1">
           <input v-model.number="form.deadline_minutes" type="number" min="5" class="input max-w-32" required />
           <button v-for="m in [60, 240, 480]" :key="m" type="button" class="btn-secondary" @click="form.deadline_minutes = m">{{ m / 60 }} ч</button>
         </div>

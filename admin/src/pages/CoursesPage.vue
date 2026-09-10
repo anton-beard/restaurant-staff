@@ -53,7 +53,7 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center gap-4">
+    <div class="flex flex-wrap items-center gap-3">
       <h1 class="text-xl font-semibold">Курсы</h1>
       <RouterLink to="/learning/courses/new" class="btn ml-auto">Новый курс</RouterLink>
     </div>
@@ -67,25 +67,25 @@ onMounted(load)
         <button class="btn-secondary" @click="publishing = null">Отмена</button>
       </div>
     </div>
-    <table class="w-full bg-white rounded-xl shadow text-sm">
+    <div class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500">
-        <tr><th class="px-4 py-2">Название</th><th class="px-4 py-2">Должности</th><th class="px-4 py-2">Уроков</th><th class="px-4 py-2">Срок, дней</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>
+        <tr><th class="px-4 py-2">Название</th><th class="hidden md:table-cell px-4 py-2">Должности</th><th class="hidden md:table-cell px-4 py-2">Уроков</th><th class="hidden md:table-cell px-4 py-2">Срок, дней</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>
       </thead>
       <tbody class="divide-y">
         <tr v-for="c in courses" :key="c.id" :class="{ 'text-gray-400': c.status === 'archived' }">
           <td class="px-4 py-2">{{ c.title }}</td>
-          <td class="px-4 py-2">{{ positionNames(c.position_ids) || '—' }}</td>
-          <td class="px-4 py-2">{{ c.lesson_count }}</td>
-          <td class="px-4 py-2">{{ c.due_days }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ positionNames(c.position_ids) || '—' }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ c.lesson_count }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ c.due_days }}</td>
           <td class="px-4 py-2">{{ STATUS[c.status] }}</td>
-          <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+          <td class="px-4 py-2 text-right"><div class="flex flex-col sm:flex-row sm:justify-end gap-1 sm:gap-2">
             <RouterLink :to="`/learning/courses/${c.id}/edit`" class="btn-secondary">Изменить</RouterLink>
             <button v-if="c.status !== 'published'" class="btn-secondary" @click="publish(c)">Опубликовать</button>
             <button v-if="c.status !== 'archived'" class="btn-secondary" @click="archive(c)">В архив</button>
-          </td>
+          </div></td>
         </tr>
         <tr v-if="courses.length === 0"><td colspan="6" class="px-4 py-3 text-gray-500">Пока пусто</td></tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 </template>

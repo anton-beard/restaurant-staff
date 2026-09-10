@@ -55,46 +55,46 @@ watch(filters, load)
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
     <div class="flex flex-wrap gap-2">
-      <select v-model="filters.status" class="input max-w-48">
+      <select v-model="filters.status" class="input sm:max-w-48">
         <option value="">Все статусы</option>
         <option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">{{ label }}</option>
       </select>
-      <select v-model="filters.employee_id" class="input max-w-56">
+      <select v-model="filters.employee_id" class="input sm:max-w-56">
         <option value="">Все сотрудники</option>
         <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option>
       </select>
-      <select v-model="filters.template_id" class="input max-w-64">
+      <select v-model="filters.template_id" class="input sm:max-w-64">
         <option value="">Все задания</option>
         <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.title }}</option>
       </select>
     </div>
 
-    <table class="w-full bg-white rounded-xl shadow text-sm">
+    <div class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500">
         <tr>
           <th class="px-4 py-2">Задание</th>
           <th class="px-4 py-2">Сотрудник</th>
-          <th class="px-4 py-2">Выдано</th>
+          <th class="hidden md:table-cell px-4 py-2">Выдано</th>
           <th class="px-4 py-2">Срок</th>
           <th class="px-4 py-2">Статус</th>
-          <th class="px-4 py-2">ИИ</th>
+          <th class="hidden md:table-cell px-4 py-2">ИИ</th>
         </tr>
       </thead>
       <tbody class="divide-y">
         <tr v-for="r in rows" :key="r.id" class="cursor-pointer hover:bg-gray-50" :class="{ 'text-red-700': r.status === 'overdue' }" @click="open(r)">
           <td class="px-4 py-2">{{ r.title }}</td>
           <td class="px-4 py-2">{{ r.employee_name ?? '—' }}</td>
-          <td class="px-4 py-2">{{ fmtDate(r.issued_at) }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ fmtDate(r.issued_at) }}</td>
           <td class="px-4 py-2">{{ fmtDate(r.due_at) }}</td>
           <td class="px-4 py-2">{{ STATUS_LABEL[r.status] }}</td>
-          <td class="px-4 py-2">{{ r.last_score ?? '—' }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ r.last_score ?? '—' }}</td>
         </tr>
         <tr v-if="rows.length === 0"><td colspan="6" class="px-4 py-3 text-gray-500">Ничего не найдено</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
     <section v-if="selected" class="bg-white rounded-xl shadow p-4 space-y-3">
-      <div class="flex items-center">
+      <div class="flex flex-wrap items-center gap-2">
         <h2 class="font-semibold">{{ selected.instance.title }} — {{ selected.instance.employee_name ?? 'не взято' }}</h2>
         <button class="ml-auto btn-secondary" @click="selected = null">Закрыть</button>
       </div>

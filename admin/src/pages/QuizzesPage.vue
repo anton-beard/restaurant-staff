@@ -38,26 +38,26 @@ onMounted(load)
       <RouterLink to="/learning/quizzes/new" class="btn ml-auto">Новый тест</RouterLink>
     </div>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-    <table class="w-full bg-white rounded-xl shadow text-sm">
+    <div class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500">
-        <tr><th class="px-4 py-2">Название</th><th class="px-4 py-2">Должности</th><th class="px-4 py-2">Расписание</th><th class="px-4 py-2">Вопросов</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>
+        <tr><th class="px-4 py-2">Название</th><th class="hidden md:table-cell px-4 py-2">Должности</th><th class="px-4 py-2">Расписание</th><th class="hidden md:table-cell px-4 py-2">Вопросов</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>
       </thead>
       <tbody class="divide-y">
         <tr v-for="q in quizzes" :key="q.id" :class="{ 'text-gray-400': q.status === 'archived' }">
           <td class="px-4 py-2">{{ q.title }}</td>
-          <td class="px-4 py-2">{{ positionNames(q.position_ids) || '—' }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ positionNames(q.position_ids) || '—' }}</td>
           <td class="px-4 py-2">{{ q.schedule ? describeSchedule(q.schedule) : 'Без расписания' }}</td>
-          <td class="px-4 py-2">{{ q.question_count }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ q.question_count }}</td>
           <td class="px-4 py-2">{{ STATUS[q.status] }}</td>
-          <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+          <td class="px-4 py-2 text-right"><div class="flex flex-col sm:flex-row sm:justify-end gap-1 sm:gap-2">
             <RouterLink :to="`/learning/quizzes/${q.id}/edit`" class="btn-secondary">Изменить</RouterLink>
             <button v-if="q.status !== 'published'" class="btn-secondary" @click="publish(q)">Опубликовать</button>
             <button v-if="q.status === 'published'" class="btn-secondary" @click="issue(q)">Выдать сейчас</button>
             <button v-if="q.status !== 'archived'" class="btn-secondary" @click="archive(q)">В архив</button>
-          </td>
+          </div></td>
         </tr>
         <tr v-if="quizzes.length === 0"><td colspan="6" class="px-4 py-3 text-gray-500">Пока пусто</td></tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 </template>

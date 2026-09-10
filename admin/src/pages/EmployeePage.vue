@@ -34,7 +34,7 @@ watch(days, load)
         <span class="text-gray-500">{{ card.position_name }} · {{ EMP_STATUS[card.employee.status] }} · {{ card.employee.telegram_id ? 'Telegram привязан' : 'Telegram не привязан' }}</span>
       </div>
 
-      <div class="flex items-center gap-3 text-sm">
+      <div class="flex flex-wrap items-center gap-2 text-sm">
         <span>Период:</span>
         <button v-for="d in [7, 30, 90] as RatingDays[]" :key="d" class="btn-secondary" :class="{ 'bg-gray-900 text-white': days === d }" @click="days = d">{{ d }} дней</button>
       </div>
@@ -50,7 +50,7 @@ watch(days, load)
         <button class="btn-secondary" :class="{ 'bg-gray-900 text-white': tab === 'quizzes' }" @click="tab = 'quizzes'">Тесты</button>
       </div>
 
-      <table v-if="tab === 'tasks'" class="w-full bg-white rounded-xl shadow text-sm">
+      <div v-if="tab === 'tasks'" class="table-wrap"><table class="w-full text-sm">
         <thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Задание</th><th class="px-4 py-2">Срок</th><th class="px-4 py-2">Выполнено</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2">ИИ</th></tr></thead>
         <tbody class="divide-y">
           <tr v-for="t in card.tasks" :key="t.id" :class="{ 'text-red-700': t.status === 'overdue' }">
@@ -59,9 +59,9 @@ watch(days, load)
           </tr>
           <tr v-if="card.tasks.length === 0"><td colspan="5" class="px-4 py-3 text-gray-500">Заданий за период нет</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
-      <table v-else-if="tab === 'courses'" class="w-full bg-white rounded-xl shadow text-sm">
+      <div v-else-if="tab === 'courses'" class="table-wrap"><table class="w-full text-sm">
         <thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Курс</th><th class="px-4 py-2">Урок</th><th class="px-4 py-2">Срок</th><th class="px-4 py-2">Статус</th></tr></thead>
         <tbody class="divide-y">
           <tr v-for="c in card.courses" :key="c.id" :class="{ 'text-red-700': c.status === 'overdue' }">
@@ -70,9 +70,9 @@ watch(days, load)
           </tr>
           <tr v-if="card.courses.length === 0"><td colspan="4" class="px-4 py-3 text-gray-500">Курсов нет</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
-      <table v-else class="w-full bg-white rounded-xl shadow text-sm">
+      <div v-else class="table-wrap"><table class="w-full text-sm">
         <thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Тест</th><th class="px-4 py-2">Срок</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2">Попытки</th></tr></thead>
         <tbody class="divide-y">
           <tr v-for="q in card.quizzes" :key="q.id" :class="{ 'text-red-700': q.status === 'overdue' }">
@@ -84,7 +84,7 @@ watch(days, load)
           </tr>
           <tr v-if="card.quizzes.length === 0"><td colspan="4" class="px-4 py-3 text-gray-500">Тестов нет</td></tr>
         </tbody>
-      </table>
+      </table></div>
     </template>
   </div>
 </template>

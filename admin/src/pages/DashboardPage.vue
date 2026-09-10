@@ -91,34 +91,34 @@ watch(days, loadRating)
     </div>
 
     <section class="space-y-3">
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <h2 class="font-semibold">Рейтинг сотрудников</h2>
         <div class="flex gap-1">
           <button v-for="d in [7, 30, 90] as RatingDays[]" :key="d" class="btn-secondary" :class="{ 'bg-gray-900 text-white': days === d }" @click="days = d">{{ d }} дней</button>
         </div>
       </div>
-      <table class="w-full bg-white rounded-xl shadow text-sm">
+      <div class="table-wrap"><table class="w-full text-sm">
         <thead class="text-left text-gray-500">
-          <tr><th class="px-4 py-2">#</th><th class="px-4 py-2">Сотрудник</th><th class="px-4 py-2">Должность</th><th class="px-4 py-2">Балл</th><th class="px-4 py-2">В срок</th><th class="px-4 py-2">Тесты</th><th class="px-4 py-2">Просрочек</th></tr>
+          <tr><th class="px-4 py-2">#</th><th class="px-4 py-2">Сотрудник</th><th class="hidden md:table-cell px-4 py-2">Должность</th><th class="px-4 py-2">Балл</th><th class="px-4 py-2">В срок</th><th class="hidden md:table-cell px-4 py-2">Тесты</th><th class="px-4 py-2">Просрочек</th></tr>
         </thead>
         <tbody class="divide-y">
           <tr v-for="r in rows" :key="r.employee_id" :class="{ 'text-red-700': r.tasks.overdue > 0 }">
             <td class="px-4 py-2">{{ r.place ?? '—' }}</td>
             <td class="px-4 py-2"><RouterLink :to="`/employees/${r.employee_id}`" class="underline">{{ r.full_name }}</RouterLink></td>
-            <td class="px-4 py-2">{{ r.position_name }}</td>
+            <td class="hidden md:table-cell px-4 py-2">{{ r.position_name }}</td>
             <td class="px-4 py-2 font-semibold">{{ r.score ?? 'нет данных' }}</td>
-            <td class="px-4 py-2">{{ r.tasks.total ? `${r.tasks.onTime} из ${r.tasks.total} (${pct(r.tasks.onTimeShare)})` : '—' }}</td>
-            <td class="px-4 py-2">{{ r.quiz.avgScore ?? '—' }}</td>
+            <td class="px-4 py-2 whitespace-nowrap">{{ r.tasks.total ? `${r.tasks.onTime} из ${r.tasks.total} (${pct(r.tasks.onTimeShare)})` : '—' }}</td>
+            <td class="hidden md:table-cell px-4 py-2">{{ r.quiz.avgScore ?? '—' }}</td>
             <td class="px-4 py-2">{{ r.tasks.overdue }}</td>
           </tr>
           <tr v-if="rows.length === 0"><td colspan="7" class="px-4 py-3 text-gray-500">Нет активных сотрудников</td></tr>
         </tbody>
-      </table>
+      </table></div>
     </section>
 
     <section class="bg-white rounded-xl shadow p-4 text-sm space-y-2 max-w-md">
       <div class="font-medium">Недельная сводка в боте</div>
-      <form v-if="digestLoaded" class="flex gap-2 items-center" @submit.prevent="saveDigest">
+      <form v-if="digestLoaded" class="flex flex-wrap gap-2 items-center" @submit.prevent="saveDigest">
         <span>По понедельникам в</span>
         <input v-model="digestTime" type="time" class="input max-w-32" required />
         <button class="btn">Сохранить</button>

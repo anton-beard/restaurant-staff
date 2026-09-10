@@ -56,14 +56,14 @@ onMounted(load)
       Показывать архивные
     </label>
 
-    <table class="w-full bg-white rounded-xl shadow text-sm">
+    <div class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500">
         <tr>
           <th class="px-4 py-2">Название</th>
           <th class="px-4 py-2">Расписание</th>
-          <th class="px-4 py-2">Кому</th>
-          <th class="px-4 py-2">Режим</th>
-          <th class="px-4 py-2">Фото</th>
+          <th class="hidden md:table-cell px-4 py-2">Кому</th>
+          <th class="hidden md:table-cell px-4 py-2">Режим</th>
+          <th class="hidden md:table-cell px-4 py-2">Фото</th>
           <th class="px-4 py-2">Статус</th>
           <th class="px-4 py-2"></th>
         </tr>
@@ -72,20 +72,20 @@ onMounted(load)
         <tr v-for="t in templates" :key="t.id" :class="{ 'text-gray-400': !t.active }">
           <td class="px-4 py-2">{{ t.title }}</td>
           <td class="px-4 py-2">{{ describeSchedule(t.schedule) }}</td>
-          <td class="px-4 py-2">{{ assignees(t) }}</td>
-          <td class="px-4 py-2">{{ t.distribution === 'each' ? 'Каждому' : 'Одно на всех' }}</td>
-          <td class="px-4 py-2">{{ t.requires_photo ? 'Да' : 'Нет' }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ assignees(t) }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ t.distribution === 'each' ? 'Каждому' : 'Одно на всех' }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ t.requires_photo ? 'Да' : 'Нет' }}</td>
           <td class="px-4 py-2">{{ !t.active ? 'В архиве' : t.schedule ? 'Активно' : 'Разовое' }}</td>
-          <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+          <td class="px-4 py-2 text-right"><div class="flex flex-col sm:flex-row sm:justify-end gap-1 sm:gap-2">
             <RouterLink :to="`/tasks/${t.id}/edit`" class="btn-secondary">Изменить</RouterLink>
             <button class="btn-secondary" @click="toggle(t)">{{ t.active ? 'В архив' : 'Вернуть' }}</button>
             <button class="btn-secondary" :disabled="t.has_instances" :title="t.has_instances ? 'По заданию уже есть история, отправьте его в архив' : ''" @click="remove(t)">Удалить</button>
-          </td>
+          </div></td>
         </tr>
         <tr v-if="templates.length === 0">
           <td colspan="7" class="px-4 py-3 text-gray-500">Пока пусто</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 </template>

@@ -62,10 +62,12 @@ onMounted(load)
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
     <ul class="bg-white rounded-xl shadow divide-y">
-      <li v-for="p in positions" :key="p.id" class="flex items-center px-4 py-2 gap-2">
-        <span class="flex-1">{{ p.name }}</span>
-        <button class="btn-secondary" @click="rename(p)">Переименовать</button>
-        <button class="btn-secondary" @click="remove(p)">Удалить</button>
+      <li v-for="p in positions" :key="p.id" class="flex flex-wrap items-center px-4 py-2 gap-2">
+        <span class="flex-1 min-w-32">{{ p.name }}</span>
+        <div class="flex gap-2 shrink-0">
+          <button class="btn-secondary" @click="rename(p)">Переименовать</button>
+          <button class="btn-secondary" @click="remove(p)">Удалить</button>
+        </div>
       </li>
       <li v-if="positions.length === 0" class="px-4 py-3 text-sm text-gray-500">Пока пусто</li>
     </ul>

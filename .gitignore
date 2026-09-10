@@ -3,3 +3,4 @@ dist
 admin/dist
 data
 .env
+data-preview/

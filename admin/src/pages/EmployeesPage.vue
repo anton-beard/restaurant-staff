@@ -118,13 +118,13 @@ onMounted(load)
       Показывать архивных
     </label>
 
-    <table class="w-full bg-white rounded-xl shadow text-sm">
+    <div class="table-wrap"><table class="w-full text-sm">
       <thead class="text-left text-gray-500">
         <tr>
           <th class="px-4 py-2">Имя</th>
           <th class="px-4 py-2">Телефон</th>
-          <th class="px-4 py-2">Должность</th>
-          <th class="px-4 py-2">Статус</th>
+          <th class="hidden md:table-cell px-4 py-2">Должность</th>
+          <th class="hidden md:table-cell px-4 py-2">Статус</th>
           <th class="px-4 py-2"></th>
         </tr>
       </thead>
@@ -132,18 +132,18 @@ onMounted(load)
         <tr v-for="e in employees" :key="e.id">
           <td class="px-4 py-2"><RouterLink :to="`/employees/${e.id}`" class="underline">{{ e.full_name }}</RouterLink></td>
           <td class="px-4 py-2">{{ e.phone }}</td>
-          <td class="px-4 py-2">{{ positionName(e.position_id) }}</td>
-          <td class="px-4 py-2">{{ statusLabel[e.status] }}</td>
-          <td class="px-4 py-2 text-right space-x-2">
+          <td class="hidden md:table-cell px-4 py-2">{{ positionName(e.position_id) }}</td>
+          <td class="hidden md:table-cell px-4 py-2">{{ statusLabel[e.status] }}</td>
+          <td class="px-4 py-2 text-right"><div class="flex flex-col sm:flex-row sm:justify-end gap-1 sm:gap-2">
             <button v-if="e.status !== 'archived'" class="btn-secondary" @click="startEdit(e)">Изменить</button>
             <button v-if="e.status !== 'archived'" class="btn-secondary" @click="archive(e)">В архив</button>
             <button v-if="e.status === 'archived'" class="btn-secondary" @click="unarchive(e)">Вернуть</button>
-          </td>
+          </div></td>
         </tr>
         <tr v-if="employees.length === 0">
           <td colspan="5" class="px-4 py-3 text-gray-500">Пока пусто</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 </template>

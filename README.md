@@ -51,6 +51,7 @@ npm install
 cp .env.example .env   # заполнить
 set -a; source .env; set +a; npm run dev   # сервер на :3000
 npm run dev:admin                          # админка на :5173 с прокси на :3000
+npm run dev:ui                             # админка на :3001 без Telegram: демо-данные, код входа в консоли
 npm test
 npm run typecheck
 ```
