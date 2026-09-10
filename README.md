@@ -25,8 +25,9 @@ Cookie сессии в контейнере ставится только по H
 
 1. Домен (или поддомен) с A-записью на IP сервера. Без домена подойдёт имя `1-2-3-4.sslip.io` (IP сервера через дефисы): sslip.io бесплатно резолвит его в этот IP, регистрация не нужна.
 2. В `.env` дополнительно `DOMAIN=staff.example.com` и `PUBLIC_URL=https://staff.example.com`.
-3. `docker compose -f docker-compose.prod.yml up -d --build` — порты 80 и 443 должны быть открыты.
-4. Обновление: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+3. `mkdir -p data && chown 1000:1000 data` — приложение в контейнере работает от пользователя `node` (uid 1000), папка данных должна принадлежать ему.
+4. `docker compose -f docker-compose.prod.yml up -d --build` — порты 80 и 443 должны быть открыты.
+5. Обновление: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
 
 ## Что умеет
 
